@@ -181,6 +181,19 @@ def _normalize_article_number(raw_number: str, previous_base: int | None) -> Tup
 	return raw_number, current_base
 
 
+def _extract_subarticle_suffix(raw_article_body: str) -> str | None:
+	"""Extract a leading sub-article marker from article body text.
+
+	Examples:
+	- "-1 ..." -> "1"
+	- ".2 ..." -> "2"
+	"""
+	match = re.match(r"(?is)^\s*[\.\-–—]\s*(\d{1,3})\b", raw_article_body)
+	if match:
+		return match.group(1)
+	return None
+
+
 def _line_starts_with(text: str, keyword: str) -> bool:
 	return re.match(rf"(?i)^\s*{re.escape(keyword)}\b", text) is not None
 
@@ -385,7 +398,18 @@ def _extract_articles(
 		start_page = _position_to_page(match.start(), page_ranges)
 		end_page = _position_to_page(end_idx, page_ranges)
 
-		content = _strip_footnotes_from_content(raw_text[start_idx:content_end])
+		raw_article_body = raw_text[start_idx:content_end]
+		subarticle_suffix = _extract_subarticle_suffix(raw_article_body)
+		if (
+			subarticle_suffix is not None
+			and previous_article_base is not None
+			and current_article_base is not None
+			and previous_article_base == current_article_base
+			and re.fullmatch(r"\d+", article_number) is not None
+		):
+			article_number = f"{current_article_base}-{subarticle_suffix}"
+
+		content = _strip_footnotes_from_content(raw_article_body)
 		# Flatten whitespace so content is easier to read in JSON/CSV and Excel.
 		content = re.sub(r"\r?\n+", " ", content)
 		content = re.sub(r"[ \t]+", " ", content)

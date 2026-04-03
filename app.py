@@ -155,6 +155,32 @@ def _normalize_heading(value: str) -> str:
 	return cleaned
 
 
+def _normalize_article_number(raw_number: str, previous_base: int | None) -> Tuple[str, int | None]:
+	"""Normalize OCR-merged superscript references in article numbers.
+
+	Example: if previous article is 9, raw "1012" is normalized to "10.12".
+	"""
+	raw_number = raw_number.strip()
+	if not raw_number.isdigit():
+		return raw_number, previous_base
+
+	current_base = int(raw_number)
+	if previous_base is None:
+		return raw_number, current_base
+
+	expected_base = previous_base + 1
+	expected_str = str(expected_base)
+
+	# If OCR merged a superscript/reference number into the article number,
+	# split it as <expected_article>.<suffix>.
+	if raw_number.startswith(expected_str) and len(raw_number) > len(expected_str):
+		suffix = raw_number[len(expected_str):]
+		if suffix.isdigit() and len(suffix) <= 3:
+			return f"{expected_str}.{suffix}", expected_base
+
+	return raw_number, current_base
+
+
 def _line_starts_with(text: str, keyword: str) -> bool:
 	return re.match(rf"(?i)^\s*{re.escape(keyword)}\b", text) is not None
 
@@ -298,6 +324,7 @@ def _extract_articles(
 	matches = list(ARTICLE_PATTERN.finditer(raw_text))
 	articles: List[Dict[str, str]] = []
 	h_idx = 0
+	previous_article_base: int | None = None
 
 	current_livre = ""
 	current_titre = ""
@@ -335,7 +362,11 @@ def _extract_articles(
 		if _should_skip_article_from_previous_context(raw_text, match.start()):
 			continue
 
-		article_number = match.group(1)
+		raw_article_number = match.group(1)
+		article_number, current_article_base = _normalize_article_number(
+			raw_article_number,
+			previous_article_base,
+		)
 		start_idx = match.end()
 		next_match_start = matches[i + 1].start() if i + 1 < len(matches) else len(raw_text)
 
@@ -374,6 +405,9 @@ def _extract_articles(
 				"source_relative_path": source_relative_path,
 			}
 		)
+
+		if current_article_base is not None:
+			previous_article_base = current_article_base
 
 	return articles
 

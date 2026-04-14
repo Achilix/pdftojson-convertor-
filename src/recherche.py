@@ -156,15 +156,24 @@ def format_result(article: Dict[str, Any], similarity: float, rank: int) -> str:
 	"""Format a search result for display."""
 	article_num = article.get("article_number") or article.get("article", "Unknown")
 	content = article.get("content", "")[:200]
-	page_start = article.get("pages", {}).get("start") if isinstance(article.get("pages"), dict) else article.get("page_start", "?")
-	page_end = article.get("pages", {}).get("end") if isinstance(article.get("pages"), dict) else article.get("page_end", "?")
+	
+	# Handle pages field - can be string like "158" or "158-159" or dict
+	pages = article.get("pages", "?")
+	if isinstance(pages, dict):
+		page_start = pages.get("start", "?")
+		page_end = pages.get("end", "?")
+		pages_str = f"{page_start}-{page_end}"
+	else:
+		pages_str = str(pages) if pages else "?"
+	
+	# Only show content line if there's actual content
+	content_line = f"Content: {content}...\n" if content else ""
 	
 	return f"""\
 #{rank} - Similarity: {similarity:.4f} ({similarity*100:.2f}%)
 Article: {article_num}
-Page(s): {page_start}-{page_end}
-Content: {content}...
-"""
+Page(s): {pages_str}
+{content_line}"""
 
 
 def main():

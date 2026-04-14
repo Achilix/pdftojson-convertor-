@@ -29,11 +29,99 @@ It is designed for documents structured with headings such as:
 
 ## Project Structure
 
-- `app.py`: main extraction script
-- `add_ids.py`: adds `id` values to extracted article files
-- `generate_questions.py`: generates questions from a single `*_with_ids.json` file
-- `pdfs/`: input PDFs
-- `output/`: generated JSON/CSV
+```
+project/
+├── src/                    # Source code
+│   ├── app.py             # Main extraction script
+│   ├── add_ids.py         # Adds `id` values to extracted article files
+│   ├── generate_questions.py  # Generates questions from a single `*_with_ids.json` file
+│   ├── embed.py           # Generates embeddings for articles using Gemini API
+│   └── recherche.py       # Semantic search using cosine similarity on embeddings
+├── pdfs/                  # Input PDF files
+├── output/                # Generated JSON/CSV files
+├── README.md              # This file
+└── .gitignore
+```
+
+### Running Scripts
+
+From the project root directory:
+
+```bash
+python src/app.py
+python src/add_ids.py
+python src/generate_questions.py
+python src/embed.py <input_json_file>
+```
+
+#### Embedding Articles
+
+The `embed.py` script generates vector embeddings for articles using Google Generative AI (Gemini):
+
+```bash
+# Basic usage (embeds 'content' field)
+python src/embed.py output/extracted/codedecommerce_articles.json
+
+# With custom output file
+python src/embed.py output/extracted/codedecommerce_articles.json -o output/embeddings/codedecommerce_embedded.json
+
+# Specify custom text field to embed
+python src/embed.py output/extracted/codedecommerce_articles.json -f "article"
+
+# Use custom API key
+python src/embed.py output/extracted/codedecommerce_articles.json -k YOUR_API_KEY
+```
+
+**Requirements for embedding:**
+- Google API key (already configured in the script)
+- Install google-generativeai: `pip install google-generativeai`
+
+The script generates a new JSON file with an `embedding` field added to each article.
+
+#### Semantic Search Using Cosine Similarity
+
+The `recherche.py` script performs semantic search on embedded articles using cosine similarity of embedding vectors:
+
+```bash
+# Basic search (returns top 5 results)
+python src/recherche.py output/embeddings/codedecommerce_embedded.json -q "obligation d'ouvrir un compte"
+
+# Custom number of results
+python src/recherche.py output/embeddings/codedecommerce_embedded.json -q "compte bancaire" -k 10
+
+# Set minimum similarity threshold (0.0-1.0)
+python src/recherche.py output/embeddings/codedecommerce_embedded.json -q "commerce électronique" -t 0.5
+
+# Interactive mode (prompts for query)
+python src/recherche.py output/embeddings/codedecommerce_embedded.json
+```
+
+**Features:**
+- **Multilingual support**: Works with French, English, and other languages via Gemini embeddings
+- Pure cosine similarity (no AI re-inference needed) - query embedding created once, compared against 841 pre-computed article embeddings
+- Configurable number of results (default: 5)
+- Optional similarity threshold filtering
+- Shows similarity percentage and article content preview
+- 3072-dimensional vector embeddings from `gemini-embedding-001` model
+
+**How it works:**
+1. Query is embedded once using Gemini API (3072 dims)
+2. Pre-computed article embeddings loaded from JSON (841 articles × 3072 dims)
+3. Cosine similarity calculated between query and each article embedding
+4. Results sorted by similarity score and returned
+
+**Example output (French query):**
+```
+#1 - Similarity: 0.8094 (80.94%)
+Article: 18
+Page(s): ?-?
+Content: Tout commerçant, pour les besoins de son commerce, a l'obligation d'ouvrir un compte...
+
+#2 - Similarity: 0.7162 (71.62%)
+Article: 488
+Page(s): ?-?
+Content: L'établissement bancaire doit, préalablement à l'ouverture d'un compte, vérifier...
+```
 
 ## Requirements
 
@@ -42,11 +130,13 @@ It is designed for documents structured with headings such as:
   - `pandas`
   - `pymupdf`
   - `requests`
+  - `google-genai` (for embedding articles with Gemini API)
+  - `numpy` (for cosine similarity calculations in semantic search)
 
 Install dependencies:
 
 ```bash
-pip install pandas pymupdf requests
+pip install pandas pymupdf requests google-genai numpy
 ```
 
 ## Usage

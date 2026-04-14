@@ -1,0 +1,85 @@
+{
+  "source_file": "Code_du_travail_articles_with_ids.json",
+  "model": "qwen2.5:latest",
+  "questions_per_article": 10,
+  "chunk_size": 5,
+  "batch_index": 2,
+  "batch_articles": 5,
+  "articles": [
+    {
+      "article_id": 6,
+      "questions": [
+        "Qu'est-ce qu'une salariée selon l'article 6 ?",
+        "Quels sont les éléments constitutifs de la qualité de salariée mentionnée dans cet article ?",
+        "Qui peut être considéré comme employeur en vertu de cette définition ?",
+        "Comment est définie la rémunération du salarié dans ce texte ?",
+        "Quelle date et quel dahir régissent l'engagement du salarié selon l'article 6 ?",
+        "Quel est le mode de publication du dahir mentionné dans l'article 6 ?",
+        "Dans quelle section du Code du travail se trouve cet article 6 ?",
+        "Sur quels types de services peut s'appuyer un employeur en vertu de cette définition ?",
+        "Quelle est la nature possible des services fournis par le salarié selon l'article 6 ?",
+        "Comment est définie la personne qui loue les services d'une ou plusieurs personnes physiques dans ce texte ?"
+      ]
+    },
+    {
+      "article_id": 7,
+      "questions": [
+        "Quels types de salariés sont assimilés à des directeurs et chefs d'établissement selon cet article?",
+        "Dans quel livre de la loi est appliquée cette responsabilité?",
+        "Quelles conditions de travail peuvent être fixées par ces salariés en vertu de l'article?",
+        "Qui assume la responsabilité de l'application des dispositions du livre II lorsqu'ils fixent les conditions de travail?",
+        "Quels autres aspects de la loi sont-ils également tenus de mettre en œuvre?",
+        "Comment est définie la responsabilité de ces salariés en cas d'embauche et de licenciement?",
+        "Dans quel contexte ces salariés sont-ils seuls chargés des décisions concernant les conditions de travail?",
+        "Quelle est la nature du lien contractuel entre ces salariés et l'entreprise mentionnée dans l'article?",
+        "Comment peut-on interpréter le rôle de ces salariés en termes de responsabilité légale?",
+        "Quels sont les conséquences potentielles si ces salariés ne respectent pas leurs obligations selon l'article?"
+      ]
+    },
+    {
+      "article_id": 8,
+      "questions": [
+        "Quels sont les critères définissant un salarié travaillant à domicile selon l'article 8 du Code du travail ?",
+        "Peut-on déterminer si une personne est un salarié travaillant à domicile en vérifiant s'il existe ou non un lien de subordination juridique avec son employeur ?",
+        "Est-il nécessaire d'évaluer la surveillance immédiate et habituelle de l'employeur sur le lieu de travail du salarié à domicile ?",
+        "Peut-on considérer que le local où le salarié à domicile effectue ses tâches appartient ou non à l'employeur ?",
+        "Quelles sont les conditions spécifiques concernant la fourniture des matières premières par le salarié à domicile ?",
+        "Le travail peut-il être réalisé seul, avec un assistant unique, ou avec conjoints et enfants non-salariés selon l'article 8 du Code du travail ?",
+        "Pour quel type d'entreprises est défini ce statut de salarié travaillant à domicile dans l'article 8 ?",
+        "Quelle est la nature de la rémunération reçue par un salarié travaillant à domicile ?",
+        "Peut-on considérer que le travail effectué par un salarié à domicile est fait pour le compte d'une ou plusieurs entreprises en vertu de l'article 8 du Code du travail ?",
+        "Quels sont les assistants autorisés selon l'article 8 du Code du travail dans le contexte des tâches réalisées par un salarié travaillant à domicile ?"
+      ]
+    },
+    {
+      "article_id": 9,
+      "questions": [
+        "Quelles libertés sont protégées par l'article 9 du Code du travail ?",
+        "Quel type de discrimination est interdite aux salariés selon l'article 9 ?",
+        "Quels principes d'égalité des chances et de traitement équitable en matière d'emploi doit respecter la législation, selon l'article 9 ?",
+        "Quel droit est accordé à la femme mariée ou non par les dispositions de l'article 9 du Code du travail ?",
+        "Comment peut-on interpréter le terme 'atteinte aux libertés et droits relatifs à l'exercice syndical' dans le contexte de l'article 9 ?",
+        "Quelle mesure discriminatoire est explicitement interdite envers les salariés, selon l'article 9 ?",
+        "Quel droit est accordé à la femme concernant son contrat de travail, d'après l'article 9 du Code du travail ?",
+        "L'article 9 mentionne-t-il des conséquences spécifiques pour les employeurs et les salariés en cas de violation de ses dispositions ? Si oui, lesquelles ?",
+        "Quels aspects du travail sont explicitement mentionnés comme étant concernés par la discrimination interdite dans l'article 9 ?",
+        "Comment peut-on interpréter le terme 'principe d'égalité des chances' dans le contexte de l'article 9 ?"
+      ]
+    },
+    {
+      "article_id": 10,
+      "questions": [
+        "Qu'est-ce qui est interdit selon l'article?",
+        "Pour quel type de travail est interdite la réquisition des salariés?",
+        "Comment peut-on qualifier le travail mentionné dans cet article?",
+        "Quelle est la condition du travail mentionnée dans l'article?",
+        "Quels sont les droits des salariés protégés par cette disposition légale?",
+        "Quel en est le but principal de cette interdiction selon l'article?",
+        "À qui s'applique cette règle énoncée dans l'article?",
+        "Peut-on réquisitionner un salarié pour exécuter un travail bénévole?",
+        "Est-ce que la réquisition peut être faite par n'importe quel employeur?",
+        "Quelle conséquence pourrait-il y avoir si une entreprise violait cette interdiction?"
+      ]
+    }
+  ]
+}

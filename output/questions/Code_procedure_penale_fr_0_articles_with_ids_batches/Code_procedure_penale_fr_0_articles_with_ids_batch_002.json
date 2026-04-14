@@ -1,0 +1,85 @@
+{
+  "source_file": "Code_procedure_penale_fr_0_articles_with_ids.json",
+  "model": "qwen2.5:latest",
+  "questions_per_article": 10,
+  "chunk_size": 5,
+  "batch_index": 2,
+  "batch_articles": 5,
+  "articles": [
+    {
+      "article_id": 6,
+      "questions": [
+        "Quels sont les principaux motifs d'éteignement de l'action publique selon cet article ?",
+        "Comment se produit l'éteignement de l'action publique par la mort du prévenu ?",
+        "Par quel mécanisme légal peut-on considérer que l'action publique est éteinte ?",
+        "Dans quels cas le retrait de plainte peut-il entraîner l'éteignement de l'action publique ?",
+        "Quelle condition doit être remplie pour que le retrait de plainte ait effet sur tous les inculpés dans un même dossier pénal ?",
+        "Quel est l'effet juridique de l'amnistie sur l'action publique ?",
+        "Comment la prescription peut-elle affecter l'action publique selon cet article ?",
+        "Lorsqu'une loi pénale est abrogée, quel est le résultat pour l'action publique engagée avant cette abrogation ?",
+        "Quel est le rôle de la chose jugée dans l'éteignement de l'action publique ?",
+        "Dans quels cas spécifiques peut-on envisager une transaction comme motif d'éteignement de l'action publique ?"
+      ]
+    },
+    {
+      "article_id": 7,
+      "questions": [
+        "Quelle est la durée de prescription pour l'action publique en cas de crime selon cet article ?",
+        "Combien d'années révolues est fixée pour la prescription dans le cas d'un délit ?",
+        "Quel est le délai de prescription pour une contravention mentionné dans cette disposition légale ?",
+        "À partir de quelle date commence à courir la période de prescription pour l'action publique ?",
+        "Quels obstacles peuvent suspendre la prescription selon cet article ?",
+        "Dans quel cas la prescription peut-elle être suspendue au profit du prévenu ?",
+        "Quel est le délai supplémentaire mentionné dans l'article 77 concernant la suspension des poursuites ?",
+        "Quel est l'effet de la volonté du prévenu sur la prescription selon cet article ?",
+        "Comment est définie la prescription pour les délits psychiatriques mentionnés à l'article 77 ?",
+        "Quelle est la source de cette disposition légale ?"
+      ]
+    },
+    {
+      "article_id": 8,
+      "questions": [
+        "Quels délais de prescription sont mentionnés dans l'article précédent?",
+        "Quel type d'actes d'instruction ou de poursuite peuvent interrompre la prescription selon cet article?",
+        "À partir de quel acte commence à courir la prescription après l'interruption de celle-ci?",
+        "Pour les personnes non impliquées dans un acte d'instruction spécifique, quand commence-t-elle la prescription?",
+        "Quel est l'effet de ces actes sur le délai de prescription pour l'action publique?",
+        "Comment se comporte la prescription après l'interruption due à des actes d'instruction ou de poursuite?",
+        "Peut-on citer un exemple hypothétique où cette disposition pourrait s'appliquer?",
+        "Quelle est la conséquence juridique si aucun de ces actes n'est réalisé pendant les délais mentionnés?",
+        "Comment cette règle affecte-t-elle le processus judiciaire en cas d'actes non suivis de jugement?",
+        "Dans quel contexte peut-on utiliser cette disposition du code?"
+      ]
+    },
+    {
+      "article_id": 9,
+      "questions": [
+        "Quel type d'action peut être exercé en même temps que l'action publique?",
+        "Qui peut exercer l'action civile selon cet article?",
+        "Que se passe-t-il si une partie porte son action devant la juridiction répressive après avoir déjà agi devant la juridiction civile?",
+        "Dans quel cas peut-on porter l'action civile devant la juridiction répressive après que celle-ci ait été saisie par le ministère public?",
+        "Quelle est la conséquence d'exercer l'action civile séparément de l'action publique?",
+        "Qui décide du dommage causé pour pouvoir exercer l'action civile?",
+        "Peut-on porter une action civile après que l'action publique ait été statuée définitivement?",
+        "Quelle est la condition pour que l'action civile puisse être portée devant la juridiction répressive?",
+        "Comment est géré le sursis à jugement dans le cas où l'action civile est exercée séparément de l'action publique?",
+        "Que signifie 'personnellement souffert du dommage causé directement par l'infraction' dans ce contexte?"
+      ]
+    },
+    {
+      "article_id": 10,
+      "questions": [
+        "Quelles conditions et délais régissent l'action civile selon cet article ?",
+        "Comment est la prescription de l'action civile liée à celle de l'action publique ?",
+        "Quelle branche du droit s'applique-t-il également à l'action civile ?",
+        "Quel type d'infraction déclenche-t-on l'action civile mentionnée dans cet article ?",
+        "Dans quels cas l'action civile et l'action publique sont-elles soumises aux mêmes conditions de prescription ?",
+        "Peut-on citer un autre type d'action qui est soumis à la même prescription que l'action civile ici mentionnée ?",
+        "Quelle est la différence entre l'action civile et l'action publique selon cet article ?",
+        "Comment peut-on interpréter le terme 'délais' dans ce contexte juridique ?",
+        "Est-ce que l'article précise des exceptions à sa règle sur la prescription ? Si oui, lesquelles ?",
+        "Quelle est l'importance de cette disposition pour les parties impliquées dans un procès pénal et civil combiné ?"
+      ]
+    }
+  ]
+}

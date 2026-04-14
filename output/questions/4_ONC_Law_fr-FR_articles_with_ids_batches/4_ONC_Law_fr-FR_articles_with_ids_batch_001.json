@@ -1,0 +1,85 @@
+{
+  "source_file": "4_ONC_Law_fr-FR_articles_with_ids.json",
+  "model": "qwen2.5:latest",
+  "questions_per_article": 10,
+  "chunk_size": 5,
+  "batch_index": 1,
+  "batch_articles": 5,
+  "articles": [
+    {
+      "article_id": 1,
+      "questions": [
+        "Quelles sont les sources principales d'obligations selon l'article ?",
+        "Définit-on les obligations dans cet article ?",
+        "Peut-on trouver des exemples spécifiques d'obligations mentionnées dans l'article ?",
+        "Qu'est-ce qui génère les obligations selon le texte ?",
+        "L'article parle-t-il de conventions exclusives pour la création d'obligations ?",
+        "Les quasi-contrats sont-ils mentionnés comme une source d'obligation ?",
+        "Les délits sont-ils cités comme cause d'obligations dans l'article ?",
+        "Qu'est-ce que les quasi-délits selon le texte ?",
+        "L'article distingue-t-il entre différentes sources d'obligations ?",
+        "Peut-on dire qu'un seul type de source est suffisant pour créer une obligation ?"
+      ]
+    },
+    {
+      "article_id": 2,
+      "questions": [
+        "Quelle est la première condition nécessaire pour la validité des obligations qui dérivent d'une déclaration de volonté ?",
+        "Qu'est-ce que la deuxième condition nécessaire pour la validité des obligations mentionnées dans cet article ?",
+        "Quels éléments doivent être présents dans une déclaration valable de volonté selon l'article ?",
+        "Quelle est la troisième condition requise pour la validité des obligations décrites ici ?",
+        "La quatrième condition pour la validité des obligations qui dérivent d'une déclaration de volonté est-elle mentionnée explicitement dans cet article ? Si oui, quel est-elle ?",
+        "Peut-on conclure que l'article 2 du livre 4 de la loi ONC ne parle que des conditions de validité des obligations contractuelles ?",
+        "Quels sont les éléments essentiels d'une obligation selon le texte ?",
+        "La capacité de s'obliger fait-elle partie des éléments nécessaires pour la validité des obligations mentionnées dans cet article ?",
+        "Qu'est-ce qui forme l'objet d'une obligation selon l'article 2 du livre 4 de la loi ONC ?",
+        "Quelle est la cause listée pour s'obliger, selon le texte ?"
+      ]
+    },
+    {
+      "article_id": 3,
+      "questions": [
+        "Quel type d'acte juridique peut être établi sous forme électronique selon l'article ?",
+        "Dans quel cas une mention écrite peut-elle être apposée sous forme électronique ?",
+        "Quel document a modifié et complété le premier chapitre du premier titre du premier livre du dahir formant code des obligations et des contrats ?",
+        "Quand a été promulguée la loi n° 53-05 relative à l’échange électronique de données juridiques ?",
+        "Sur quel bulletin officiel peut-on trouver cette loi ?",
+        "Quel est le numéro du bulletin officiel où se trouve cette loi ?",
+        "Quels types d'actes ne sont pas soumis aux dispositions de la présente loi ?",
+        "Parmi les actes mentionnés, lesquels peuvent être établis par une personne pour ses besoins professionnels ?",
+        "Quel est le titre du document juridique concerné dans l'article ?",
+        "Dans quel livre se trouve ce chapitre qui modifie et complète la loi sur l'échange électronique de données juridiques ?"
+      ]
+    },
+    {
+      "article_id": 4,
+      "questions": [
+        "Quel élément régule la capacité civile de l'individu selon cet article ?",
+        "À qui s'applique-t-il en termes de capacité d'engager et d'être engagé ?",
+        "Dans quel cas une personne peut-elle être déclarée incapable d'engager et d'être engagé ?",
+        "Quel est le statut personnel qui influence la capacité civile selon l'article ?",
+        "Peut-on dire que toute personne a la capacité de s'obliger et d’être obligée sans restriction ?",
+        "Quelle loi peut déclarer une personne incapable d'engager et d'être engagé ?",
+        "Quel est le sujet principal abordé dans ce texte ?",
+        "Quels sont les deux actions principales concernant la capacité civile mentionnées dans l'article ?",
+        "Comment est définie la capacité civile de l'individu en fonction du statut personnel ?",
+        "Quelle est la source principale qui règle la capacité civile selon cet article ?"
+      ]
+    },
+    {
+      "article_id": 5,
+      "questions": [
+        "Quel est l'âge de majorité légal selon cet article?",
+        "Qui peut exercer la représentation légale du mineur?",
+        "Dans quel cas un mineur ou un incapable peut-il être obligé d'exécuter ses engagements?",
+        "Comment peut-on valider les obligations contractées par un mineur ou un incapable sans l'autorisation de leur père, tuteur ou curateur?",
+        "Quels sont les motifs qui peuvent limiter la capacité d'une personne à exercer ses droits et assumer ses obligations?",
+        "Quel est le statut juridique d'un enfant qui a atteint l'âge de discernement mais n'a pas encore atteint celui de la majorité légale?",
+        "Selon cet article, quelles sont les catégories de personnes dont l'exercice de la capacité est limité?",
+        "Quel est le rôle du père ou des tuteurs dans la validation des engagements pris par un mineur ou un incapable?",
+        "Comment peut-on rescinder les obligations contractées par un mineur ou un incapable?",
+        "Dans quel document cette loi relative à l'échange électronique de données juridiques est-elle précitée?"
+      ]
+    }
+  ]
+}

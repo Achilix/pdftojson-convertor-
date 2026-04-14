@@ -1,0 +1,85 @@
+{
+  "source_file": "Code_du_travail_articles_with_ids.json",
+  "model": "qwen2.5:latest",
+  "questions_per_article": 10,
+  "chunk_size": 5,
+  "batch_index": 3,
+  "batch_articles": 5,
+  "articles": [
+    {
+      "article_id": 11,
+      "questions": [
+        "Quelles dispositions peuvent être prioritaires sur celles de la loi selon l'article ?",
+        "Donnez trois exemples d'éléments qui pourraient prendre priorité sur les dispositions légales.",
+        "Comment peut-on interpréter cette disposition dans le contexte du droit du travail français ?",
+        "Quelle est la portée de ce texte concernant les conventions collectives et les accords individuels ?",
+        "Dans quelle situation pourrait cette disposition être particulièrement utile pour un employeur ?",
+        "Comment peut-on appliquer cette règle en cas d'absence de convention collective applicable à un secteur spécifique ?",
+        "Quel est l'impact de ce texte sur la négociation des conditions de travail entre les employeurs et les salariés ?",
+        "Peut-on utiliser cette disposition pour justifier une condition de travail moins favorable que celle prévue par la loi ?",
+        "Dans quelle mesure cette disposition peut-elle influencer le processus de révision des contrats de travail ?",
+        "Comment pourrait-on expliquer l'objectif derrière cette disposition dans le Code du travail ?"
+      ]
+    },
+    {
+      "article_id": 12,
+      "questions": [
+        "Quelle est la peine pour un employeur qui contrevient aux dispositions de l'article 9 mentionné dans le texte ?",
+        "Dans quel cas l'amende pour récidive sur l'article 9 est-elle doublée ?",
+        "Combien de jours peut être suspendu un salarié qui contrevient à l'article 9 ?",
+        "Quelle est la peine supplémentaire si un salarié commet la même contravention trois fois selon l'article 12 ?",
+        "Quel est le montant minimal et maximal de l'amende pour un employeur qui contrevient aux dispositions de l'article 10 mentionné dans le texte ?",
+        "Dans quel cas une amende pour récidive sur l'article 10 peut-elle être accompagnée d'un emprisonnement ?",
+        "Quel est la durée minimale et maximale d'emprisonnement pour un employeur qui commet la récidive mentionnée dans le texte ?",
+        "Peut-on subir à la fois une amende et une peine de prison pour la récidive mentionnée dans l'article 12 ?",
+        "Quelle est la conséquence d'une troisième contravention pour un salarié selon les dispositions du texte ?",
+        "Sur quels articles du code sont basées les sanctions mentionnées dans le texte ?"
+      ]
+    },
+    {
+      "article_id": 13,
+      "questions": [
+        "Quelles parties peuvent rompre volontairement le contrat de travail pendant la période d'essai?",
+        "Après combien de temps de travail minimum peut-on rompre la période d'essai non motivée par la faute grave du salarié?",
+        "Combien de jours avant la rupture doit être donné si le salaire est payé à la journée, à la semaine ou à la quinzaine?",
+        "Combien de jours avant la rupture doit être donné si le salaire est payé au mois?",
+        "Quelle est la conséquence pour un salarié licencié sans faute grave après l'expiration de la période d'essai?",
+        "Peut-on rompre la période d'essai motivée par la faute grave du salarié?",
+        "Combien de jours minimum doit être respecté en cas de licenciement sans faute grave après la période d'essai?",
+        "Quels sont les deux types de salaires mentionnés dans l'article pour lesquels des délais spécifiques de préavis s'appliquent?",
+        "Dans quel cas peut-on rompre la période d'essai sans respecter un délai de préavis?",
+        "Quelle est la durée minimale du délai de préavis après l'expiration de la période d'essai si le salarié n'a pas commis de faute grave?"
+      ]
+    },
+    {
+      "article_id": 14,
+      "questions": [
+        "Quelle est la durée maximale de la période d'essai pour un cadre?",
+        "Combien de fois peut la période d'essai être renouvelée?",
+        "Quelle est la durée maximum de la période d'essai pour un contrat à durée déterminée inférieur à six mois?",
+        "Pour quel type de contrats, la durée maximale de la période d'essai est-elle de un mois?",
+        "Peut-on prévoir une période d'essai inférieure aux durées mentionnées dans l'article par le contrat de travail?",
+        "Quel est le taux minimal pour les employés lors de la période d'essai?",
+        "Combien de jours maximum peut durer la période d'essai pour un contrat à durée déterminée supérieur à six mois?",
+        "Quels sont les groupes professionnels mentionnés dans l'article 14?",
+        "Est-il possible de surpasser les durées maximales mentionnées pour la période d'essai?",
+        "Dans quel cas, la période d'essai ne peut-elle pas dépasser deux semaines?"
+      ]
+    },
+    {
+      "article_id": 15,
+      "questions": [
+        "Quelles conditions doivent être respectées pour la validité du contrat de travail?",
+        "Dans quel cas le contrat de travail doit-il être établi en deux exemplaires?",
+        "Qui conserve l'un des deux exemplaires du contrat de travail lorsqu'il est rédigé par écrit?",
+        "Quelle autorité légitime les signatures sur le contrat de travail selon l'article?",
+        "Quels éléments fixent les conditions relatives à la validité du contrat de travail?",
+        "Quel est l'objet principal du contrat de travail en termes de validation légale?",
+        "Comment est défini l'employeur dans le contexte de la signature du contrat de travail?",
+        "Quelle est la conséquence si le contrat de travail n'est pas rédigé par écrit?",
+        "Quelles parties doivent signer le contrat de travail pour qu'il soit valable selon l'article?",
+        "Quel autre aspect du contrat de travail est mentionné comme fixant les conditions de validité?"
+      ]
+    }
+  ]
+}

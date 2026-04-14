@@ -1,0 +1,85 @@
+{
+  "source_file": "4_ONC_Law_fr-FR_articles_with_ids.json",
+  "model": "qwen2.5:latest",
+  "questions_per_article": 10,
+  "chunk_size": 5,
+  "batch_index": 4,
+  "batch_articles": 5,
+  "articles": [
+    {
+      "article_id": 16,
+      "questions": [
+        "Qu'est-ce qui rend une promesse faite par affiches ou autre moyen de publicité réputée acceptée?",
+        "Quels sont les obligations de l'auteur de la promesse après que quelqu'un a rapporté l'objet perdu ou accompli le fait?",
+        "Comment peut-on caractériser une promesse faite publiquement selon cet article?",
+        "Que se passe-t-il si une personne trouve un objet perdu et le rapporte sans connaître l'avis publicitaire?",
+        "Quelle est la conséquence juridique d'une telle action pour l'auteur de la promesse?",
+        "Dans quel cas une promesse faite publiquement est-elle considérée comme acceptée selon cet article?",
+        "Que doit faire l'auteur de la promesse après que quelqu'un a rapporté l'objet perdu ou accompli le fait?",
+        "Quels sont les moyens de publicité mentionnés dans cette disposition légale?",
+        "Comment peut-on interpréter l'expression 'récompense à celui qui trouvera un objet perdu ou accomplira un autre fait'?",
+        "Quelle est la nature juridique d'une promesse faite publiquement selon cet article?"
+      ]
+    },
+    {
+      "article_id": 17,
+      "questions": [
+        "Quelle condition doit être remplie pour que la révocation d'une promesse de récompense ne puisse plus être annulée?",
+        "Que signifie l'expression 'l'exécution commencée' dans ce contexte?",
+        "Quel est le résultat juridique d'un délai fixé par une partie concernant la révocation d'une promesse?",
+        "Dans quel cas, la révocation de la promesse de récompense peut-elle être annulée?",
+        "Que présume-t-on lorsque l'obligation a un terme fixe dans cette promesse?",
+        "Quel est le statut juridique d'un acte qui commence à être exécuté avant la révocation de la promesse de récompense?",
+        "Comment peut-on interpréter la notion de 'fait prévu' dans ce contexte?",
+        "Quelle est l'effet d'une révocation après l'exécution commencée du fait prévu?",
+        "Dans quelle situation, une partie peut-elle encore révoquer sa promesse de récompense?",
+        "Que signifie que la partie a renoncé au droit de révoquer sa promesse jusqu'à l'expiration du délai?"
+      ]
+    },
+    {
+      "article_id": 18,
+      "questions": [
+        "Qu'en cas de plusieurs personnes ayant accompli le fait prévu par la promesse de récompense en des temps divers, qui reçoit la récompense ?",
+        "Comment est partagée la récompense si les personnes ont accompli chacune pour une part du fait prévu dans la promesse de récompense ?",
+        "Qu'advient-il si le prix ou la récompense ne peut être partagé mais peut être vendu ? Qui reçoit alors ce montant ?",
+        "Dans quelle situation est la décision remise à la voie du sort selon l'article ?",
+        "Peut-on donner un exemple d'un objet qui n'a pas de valeur vénale ou ne peut être donné qu'à un seul, d'après les termes de la promesse ?",
+        "Quelle est la conséquence si le prix ou récompense consiste en un objet qui n'a pas de valeur vénale et ne peut être donné qu'à un seul personne ?",
+        "Dans quelle situation est partagée la récompense entre les ayants droit selon l'article ?",
+        "Quels sont les différents cas où la récompense ou le prix est partagé selon l'article 17 de la loi n° 70-03 ?",
+        "Comment est traité le cas où le prix ou la récompense ne peut être partagé et vendu, mais consiste en un objet sans valeur vénale ?",
+        "Quelle est la règle pour déterminer qui reçoit la récompense si plusieurs personnes ont accompli le fait prévu par la promesse de récompense en des temps divers ?"
+      ]
+    },
+    {
+      "article_id": 19,
+      "questions": [
+        "Qu'est-ce qui rend les engagements unilatéraux obligatoires selon l'article?",
+        "Que se passe-t-il dès que les engagements unilatéraux parviennent à la connaissance de la partie concernée?",
+        "Dans quel type d'obligations s'applique cette règle selon le texte?",
+        "Qui est la partie qui reçoit les engagements unilatéraux mentionnés dans l'article?",
+        "Quelle condition doit être remplie pour que les engagements unilatéraux soient considérés comme obligatoires?",
+        "Comment peut-on définir une déclaration unilatérale d'engagement selon le contexte de cet article?",
+        "Quels sont les effets juridiques des engagements unilatéraux mentionnés dans l'article?",
+        "Dans quelle partie du code est inséré cet article?",
+        "Quel est le nom complet de la loi qui contient cet article?",
+        "À quel chapitre spécifique de cette loi appartient cet article?"
+      ]
+    },
+    {
+      "article_id": 20,
+      "questions": [
+        "Quels éléments doivent être accordés par les parties pour que la convention soit considérée comme parfaite?",
+        "Quelles clauses supplémentaires peuvent être considérées comme essentielles dans une convention selon l'article?",
+        "Que se passe-t-il si les parties apportent des modifications à la convention immédiatement après sa conclusion?",
+        "Comment est qualifié le fait que les parties modifient d'un commun accord la convention après sa signature?",
+        "Quelle est la conséquence juridique des modifications apportées par les parties d'un commun accord?",
+        "Quel est l'état juridique de la convention originale si les parties y apportent des modifications?",
+        "Comment peut-on interpréter le contenu modifié d'une convention après sa conclusion?",
+        "Que signifie 'éléments essentiels de l'obligation' dans ce contexte?",
+        "Quelles sont les clauses qui ne peuvent pas être considérées comme essentielles selon l'article?",
+        "Si les parties expriment clairement le contraire, quel est l'état des modifications apportées à la convention?"
+      ]
+    }
+  ]
+}

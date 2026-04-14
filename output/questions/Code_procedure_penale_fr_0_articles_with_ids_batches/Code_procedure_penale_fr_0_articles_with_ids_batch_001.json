@@ -1,0 +1,85 @@
+{
+  "source_file": "Code_procedure_penale_fr_0_articles_with_ids.json",
+  "model": "qwen2.5:latest",
+  "questions_per_article": 10,
+  "chunk_size": 5,
+  "batch_index": 1,
+  "batch_articles": 5,
+  "articles": [
+    {
+      "article_id": 1,
+      "questions": [
+        "Quel est le titre du corpus regroupant les textes relatifs à la procédure pénale ?",
+        "Combien de pages contient l'extrait fourni ?",
+        "Quels sont les domaines couverts par le Code de procédure pénale mentionné dans cet article ?",
+        "Comment est-il possible d'accéder aux textes publiés ci-après concernant la procédure pénale ?",
+        "Peut-on trouver des informations spécifiques sur l'application de la loi pénale dans ce code ?",
+        "Quel est le but principal du regroupement de ces textes en un seul corps ?",
+        "Existe-t-il d'autres codes relatifs à la procédure pénale que celui mentionné ici ?",
+        "Comment sont organisés les chapitres et sections dans le Code de procédure pénale non mentionnés ici ?",
+        "Quels types de procédures pénales peuvent être inclus dans ce code selon l'extrait fourni ?",
+        "Est-ce que ce code s'applique uniquement aux tribunaux français ?"
+      ]
+    },
+    {
+      "article_id": 2,
+      "questions": [
+        "Quels articles du Code pénal sont abrogés selon l'article?",
+        "Quelle loi est maintenue malgré les abrogations mentionnées dans l'article?",
+        "Combien de décrets sont mentionnés comme étant abrogés par cet article?",
+        "Dans quel journal sera publiée la présente loi?",
+        "Qui a signé cette loi?",
+        "À quelle date a été faite cette loi?",
+        "Quel est le titre du code mentionné dans l'article?",
+        "Quels sont les seuls textes qui ne seront pas abrogés selon l'article?",
+        "Sur quel type d'action s'appliquent les dispositions préliminaires mentionnées à la fin de l'article?",
+        "Dans quelle ville a été faite cette loi?"
+      ]
+    },
+    {
+      "article_id": 3,
+      "questions": [
+        "Qu'est-ce qui ouvre droit à une action publique selon cet article ?",
+        "Quel est l'objectif principal d'une action publique mentionnée dans cette disposition ?",
+        "Quelle autre action peut être intentée en même temps qu'une action publique si un dommage a été causé ?",
+        "Quels sont les deux types d'action mentionnées dans ce texte ?",
+        "Comment se nomme l'action qui vise à réparer un dommage causé par une infraction ?",
+        "Quelle est la conséquence juridique principale d'une infraction selon cet article ?",
+        "Peut-on intenter une action civile sans avoir déjà engagé une action publique ? (Oui/Non)",
+        "Quel type de dommage peut justifier l'intention d'une action civile en complément d'une action publique ?",
+        "Dans quel cas est-il possible d'engager à la fois une action publique et une action civile ?",
+        "Que signifie 'ouverture à une action publique' dans le contexte juridique ?"
+      ]
+    },
+    {
+      "article_id": 4,
+      "questions": [
+        "Quel organisme est responsable de l'action publique selon cet article?",
+        "Par qui peut-elle être exercée l'action publique?",
+        "Dans quels cas la partie lésée peut-elle également engager l'action publique?",
+        "Quelles sont les parties concernées par l'action publique en vertu de ce texte?",
+        "Comment est définie l'action publique dans ce contexte juridique?",
+        "Qui confère le pouvoir d'exercer l'action publique aux fonctionnaires?",
+        "Peut-on engager l'action publique sans la loi qui la confie?",
+        "Quelle est la source légale de l'action publique selon cet article?",
+        "Dans quel document peut-on trouver les conditions spécifiques pour que la partie lésée puisse engager l'action publique?",
+        "Que signifie 'mise en mouvement' dans le cadre de cette action juridique?"
+      ]
+    },
+    {
+      "article_id": 5,
+      "questions": [
+        "Quelles conditions doivent être respectées pour que l'action publique puisse être engagée selon cet article ?",
+        "Que se passe-t-il si une plainte est retirée ou si la personne renonce à son action civile ?",
+        "L'action publique peut-elle être arrêtée par le retrait de la plainte ?",
+        "Quel est l'état actuel de l'action publique si la plainte est retirée, selon cet article ?",
+        "Dans quel cas l'action publique serait-elle subordonnée à l'existence d'une plainte ?",
+        "Peut-on suspendre l'action publique par le retrait de la plainte ou la renonciation à l'action civile ?",
+        "Quel est l'unique condition mentionnée dans cet article pour engager l'action publique ?",
+        "Que signifie 'l'action publique n'est pas subordonnée à l'existence d'une plainte' ?",
+        "Est-ce que cette disposition concerne uniquement la procédure civile ou aussi pénale ?",
+        "Quel est le but principal de cette disposition législative selon votre compréhension ?"
+      ]
+    }
+  ]
+}

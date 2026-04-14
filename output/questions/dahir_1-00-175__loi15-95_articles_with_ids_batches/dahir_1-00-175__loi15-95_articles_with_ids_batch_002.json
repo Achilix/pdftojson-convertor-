@@ -1,0 +1,85 @@
+{
+  "source_file": "dahir_1-00-175__loi15-95_articles_with_ids.json",
+  "model": "qwen2.5:latest",
+  "questions_per_article": 10,
+  "chunk_size": 5,
+  "batch_index": 2,
+  "batch_articles": 5,
+  "articles": [
+    {
+      "article_id": 6,
+      "questions": [
+        "Quels types de créances sont concernées par cet article ?",
+        "Qui adresse l'avis au redevable selon l'article ?",
+        "Quelles informations doivent contenir les avis dûment émis conformément à l'article ?",
+        "Quelle exception est mentionnée dans l'article concernant le recouvrement des créances ?",
+        "Quels sont les éléments précisés dans l'avis émis au redevable ?",
+        "Comment peut-on décrire la nature de la créance mentionnée dans l'article ?",
+        "Quel est le montant qui doit être précisé dans l'avis selon l'article 6 ?",
+        "Quelles dates doivent être indiquées dans l'avis émis par le comptable ?",
+        "Quels sont les modes de recouvrement exclus par cet article ?",
+        "Pour quelles créances ne s'applique pas la procédure décrite dans l'article ?"
+      ]
+    },
+    {
+      "article_id": 7,
+      "questions": [
+        "Quels sont les deux modes de recouvrement des créances publiques mentionnés dans l'article ?",
+        "Dans quel délai peut le recouvrement se faire à l'amiable pour les créances publiques ?",
+        "Quelle est la conséquence si le paiement n'est pas effectué amiablement ?",
+        "Comment est définie la période de mise en recouvrement selon l'article ?",
+        "Quel type de procédure est utilisé lorsque le recouvrement ne se fait pas amiablement ?",
+        "Dans quel cas précisément peut-on recourir à un recouvrement forcé pour les créances publiques ?",
+        "Quelle loi fixe les conditions du recouvrement forcé mentionné dans l'article ?",
+        "Quels sont les deux moments de la période de mise en recouvrement où le recouvrement peut se faire amiablement ?",
+        "Comment est définie la date d'exigibilité des créances publiques dans ce contexte ?",
+        "Que signifie 'ordres de recette' dans le cadre du recouvrement des créances publiques selon l'article ?"
+      ]
+    },
+    {
+      "article_id": 8,
+      "questions": [
+        "Quels documents sont mentionnés dans l'article 8?",
+        "Qui revêt les documents de la formule exécutoire selon l'article 8?",
+        "Quelle est la condition d'application immédiate de la formule exécutoire?",
+        "Quelles taxes sont concernées par cette disposition?",
+        "Parmi les documents mentionnés, lequel concerne spécifiquement la taxe judiciaire?",
+        "Quel est le ministère responsable de l'exécution des documents mentionnés dans cet article?",
+        "Qui peut être délégué pour revêtir ces documents de la formule exécutoire?",
+        "Quels produits sont inclus dans les documents visés par cette disposition?",
+        "Comment est définie la force exécutoire selon l'article 8?",
+        "Quel est le but principal de cette disposition législative?"
+      ]
+    },
+    {
+      "article_id": 9,
+      "questions": [
+        "Quels types d'ordres de recette sont mentionnés dans cet article ?",
+        "Par qui est revêtue la formule exécutoire selon l'article ?",
+        "Quand est-ce que cette formule exécutoire devient effective ?",
+        "L'ordonnateur de quel organisme signe-t-il ces ordres de recette ?",
+        "Lesquels d'entre les établissements publics sont concernés par cette disposition ?",
+        "Quelle est la conséquence légale si un ordre de recette n'est pas revêtu de la formule exécutoire ?",
+        "Peut-on contester l'exécution d'un ordre de recette qui ne comporte pas la formule exécutoire ?",
+        "Comment peut-on valider une procédure d'émission d'ordres de recette selon cet article ?",
+        "Quels sont les taxes et impôts concernés par cette disposition ?",
+        "Est-ce que tous les types d'ordres de recette sont soumis à la même règle ?"
+      ]
+    },
+    {
+      "article_id": 10,
+      "questions": [
+        "Quels types de documents sont mentionnés dans cet article?",
+        "Selon cet article, quelles sont les conséquences des extraits de jugements et arrêts concernant les amendes et condamnations pécuniaires?",
+        "A quelle section spécifique du document se réfère l'article pour déterminer les conditions d'exécution?",
+        "Quels sont les frais mentionnés dans cet article qui sont exécutoires?",
+        "Cet article concerne-t-il uniquement les amendes et condamnations pécuniaires ou inclut-il d'autres types de sanctions?",
+        "Quel est le numéro de l'article cité à la fin du texte qui détermine les conditions d'exécution?",
+        "Les extraits de jugements concernant quels aspects des décisions judiciaires sont-ils exécutoires selon cet article?",
+        "Cet article traite-t-il spécifiquement des frais de justice ou des dépens uniquement?",
+        "Quelles sont les sanctions mentionnées dans cet article qui peuvent être exécutées par voie d'exécution forcé?",
+        "Comment est qualifié le statut juridique des extraits de jugements et arrêts mentionnés dans cet article?"
+      ]
+    }
+  ]
+}

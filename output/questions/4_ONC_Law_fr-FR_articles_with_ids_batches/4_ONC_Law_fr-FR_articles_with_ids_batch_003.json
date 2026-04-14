@@ -1,0 +1,85 @@
+{
+  "source_file": "4_ONC_Law_fr-FR_articles_with_ids.json",
+  "model": "qwen2.5:latest",
+  "questions_per_article": 10,
+  "chunk_size": 5,
+  "batch_index": 3,
+  "batch_articles": 5,
+  "articles": [
+    {
+      "article_id": 11,
+      "questions": [
+        "Quel est le sujet principal de cette disposition légale ?",
+        "Dans quelle situation un contractant capable ne peut-il pas opposer l'incapacité de son cocontractant ?",
+        "Que signifie 'le contractant capable de s\\'obliger' dans ce contexte ?",
+        "Quelle est la conséquence juridique si un contractant capable tente d’opposer l’incapacité de son cocontractant ?",
+        "Comment peut-on interpréter le terme 'partie avec laquelle il a contracté' ?",
+        "Quel type de contrat pourrait être concerné par cette disposition légale ?",
+        "Dans quel cas une personne non pleinement capable pourrait-elle s’engager juridiquement selon ce texte ?",
+        "Que devrait-on comprendre par 'incapacité de la partit avec laquelle il a contracté' dans l'article 10 du livre IV sur les actes de la personne non pleinement capable ?",
+        "Quel est le but principal de cette disposition légale en matière de contrats ?",
+        "Comment pourrait-on appliquer cette disposition dans un cas concret d'un contrat entre une personne capable et une personne non pleinement capable ?"
+      ]
+    },
+    {
+      "article_id": 12,
+      "questions": [
+        "Quels administrateurs sont soumis à l'autorisation spéciale du magistrat compétent pour faire des actes de disposition sur les biens gérés ?",
+        "Dans quels cas peut-on obtenir une autorisation spéciale pour faire des actes de disposition sur les biens d'un mineur ou d'un incapable ?",
+        "Qu'est-ce qui est considéré comme un acte de disposition au sens de cet article ?",
+        "Qui a la compétence pour annuler l'autorisation de remise des biens en cas de mauvaise gestion ?",
+        "Comment est défini le statut d'interdit autorisé à gérer une partie de ses biens selon ce texte ?",
+        "Quels sont les actes qui ne sont pas considérés comme des actes de disposition dans cette section ?",
+        "Quel article du dahir n° 1-96-83 peut être comparé avec celui-ci pour obtenir plus de contexte ?",
+        "Quelle est la date de promulgation du code de commerce mentionné dans l'article ?",
+        "Comment est défini le représentant légal en relation avec cet article ?",
+        "Quels sont les autres cas expressément indiqués par la loi concernant des actes qui ne sont pas considérés comme des actes de disposition ?"
+      ]
+    },
+    {
+      "article_id": 13,
+      "questions": [
+        "Quels types d'actes sont considérés comme ayant la même valeur que ceux accomplis par les majeurs selon l'article?",
+        "Dans quel cas cette règle ne s'applique-t-elle pas?",
+        "Donnez un exemple d'un acte de pure libéralité mentionné dans l'article.",
+        "Quels actes ne sont pas validés malgré une autorisation légale?",
+        "Comment peut-on déterminer si un représentant a pu accomplir lui-même des faits mentionnés dans les aveux en justice?",
+        "Quelle est la valeur juridique des actes de pure libéralité réalisés par un mineur ou un interdit?",
+        "Les actes accomplis pour l'intérêt d'une personne morale sont-ils valides selon cette règle?",
+        "Peut-on valider les aveux faits en justice si le représentant ne peut pas accomplir lui-même ces actes?",
+        "Quels sont les seuls cas où la règle de valeur des actes n'est pas applicable?",
+        "Comment est défini l'intérêt d'un mineur, d'un interdit ou d'une personne morale dans ce contexte?"
+      ]
+    },
+    {
+      "article_id": 14,
+      "questions": [
+        "Quelle condition doit être remplie pour que le représentant légal continue à exercer le commerce pour le compte du mineur ou de l'interdit?",
+        "Qui a la compétence pour autoriser le représentant légal à continuer à exercer le commerce?",
+        "Dans quel cas spécifique peut l'autorité compétente accorder cette autorisation?",
+        "Quelle est la conséquence si le représentant légal continue à exercer le commerce sans l'autorisation de l'autorité compétente?",
+        "Quel est l'objet principal de cet article dans le contexte du Code de la famille?",
+        "Qui est concerné par ce texte selon l'article?",
+        "Quelle est la nature de l'action que le représentant légal ne peut plus exercer sans autorisation?",
+        "Comment peut-on interpréter 'cas d'utilité évidente' dans ce contexte juridique?",
+        "Quel est le rôle du représentant légal envers le mineur ou l'interdit selon cet article?",
+        "Dans quel livre et section de la loi se trouve cet article?"
+      ]
+    },
+    {
+      "article_id": 15,
+      "questions": [
+        "Quel type de déclaration est mentionné dans cet article ?",
+        "Selon l'article, quelles conséquences a une simple promesse ?",
+        "Quelle loi précise le code de la famille auquel se réfère cet article ?",
+        "Dans quelle livre du code de la famille se trouve cet article ?",
+        "Quel est le titre de la section à laquelle appartient l'article 14 ?",
+        "Quel est le sous-titre de cette section ?",
+        "Sur quel sujet porte spécifiquement ce sous-titre ?",
+        "Quelle est la page où se trouve cet article dans le document fourni ?",
+        "Peut-on dire que cette promesse crée une obligation légale selon l'article ?",
+        "Quel autre article pourrait être pertinent si on cherchait à comprendre les obligations créées par d'autres formes de déclaration ?"
+      ]
+    }
+  ]
+}

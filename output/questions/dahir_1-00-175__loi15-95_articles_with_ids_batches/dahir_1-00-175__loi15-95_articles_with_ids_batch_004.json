@@ -1,0 +1,85 @@
+{
+  "source_file": "dahir_1-00-175__loi15-95_articles_with_ids.json",
+  "model": "qwen2.5:latest",
+  "questions_per_article": 10,
+  "chunk_size": 5,
+  "batch_index": 4,
+  "batch_articles": 5,
+  "articles": [
+    {
+      "article_id": 16,
+      "questions": [
+        "Quel est le délai d'exigibilité pour la plupart des créances publiques selon l'article 16 ?",
+        "Quelles dispositions spécifiques sont-elles mentionnées concernant les amendes et condamnations pécuniaires dans cet article ?",
+        "Peut-on recourir contre une décision de jugement qui rend compte d'amendes et de condamnations pécuniaires selon l'article 16 ?",
+        "Quel est le délai d'exigibilité pour les amendes et condamnations pécuniaires liées à des décisions contradictoires mentionnées dans cet article ?",
+        "Qui fixe les conditions et modalités du recouvrement des dépens et frais de justice selon l'article 16 ?",
+        "Quel est le délai d'exigibilité pour les amendes et condamnations pécuniaires, dépens et frais de justice prononcés par les juridictions du Royaume ?",
+        "Comment peut-on interpréter la phrase 'ne pouvant faire l'objet d'aucune voie de recours ordinaire' dans le contexte de cet article ?",
+        "Quelles sont les exceptions mentionnées pour l'exigibilité immédiate des amendes et condamnations pécuniaires, dépens et frais de justice ?",
+        "Quel est le statut juridique des créances publiques visées aux articles 13, 14 et 15 mentionnés dans cet article ?",
+        "Lequel d'entre les ministres est responsable de la fixation des conditions et modalités du recouvrement des dépens et frais de justice ?"
+      ]
+    },
+    {
+      "article_id": 17,
+      "questions": [
+        "Qu'arrive-t-il lorsque l'échéance du terme coïncide avec un jour férié ou chômé selon l'article?",
+        "Comment est reportée l'échéance du terme dans ce cas spécifique?",
+        "Quel type de délais sont mentionnés dans le présent code selon l'article?",
+        "Sur quels types de jours peut l'échéance du terme être reportée?",
+        "Si un délai tombe sur un jour férié, quel est le premier jour ouvrable qui en devient l'échéance?",
+        "Quelle est la nature des délais mentionnés dans ce code selon l'article?",
+        "Dans quelle situation l'échéance du terme peut-elle être reportée?",
+        "Comment définirait-on un délai franc selon cette disposition légale?",
+        "Quels sont les seuls types de jours sur lesquels l'échéance du terme peut être reportée?",
+        "Que se passe-t-il si le jour ouvrable suivant est également un jour férié?"
+      ]
+    },
+    {
+      "article_id": 18,
+      "questions": [
+        "Quels articles sont-ils mentionnés comme faisant exception à la règle de l'exigibilité immédiate selon cet article ?",
+        "Quel type de produits émis est concerné par cette disposition légale ?",
+        "Dans quel cas ces produits ne seraient-ils pas immédiatement exigibles ?",
+        "Identifiez les articles spécifiques qui pourraient permettre une dérogation à l'exigibilité immédiate mentionnée ici.",
+        "Quelle est la nature des rôles et états de produits émis dans le contexte de cette disposition légale ?",
+        "Citez deux articles cités comme faisant exception à l'exigibilité immédiate selon cet article.",
+        "Quel est le but principal de l'exigibilité immédiate selon ce texte ?",
+        "Dans quelle section de la disposition légale se trouve la mention des exceptions à l'exigibilité immédiate ?",
+        "Identifiez les articles spécifiques qui sont cités comme faisant exception à l'exigibilité immédiate dans cette disposition.",
+        "Quels types d'impôts et taxes sont concernés par cette exigibilité immédiate ?"
+      ]
+    },
+    {
+      "article_id": 19,
+      "questions": [
+        "Quelles conditions doivent être remplies pour que les créances deviennent immédiatement exigibles ?",
+        "Dans quelles situations spécifiques sont également immédiatement exigibles les créances selon l'article 19 ?",
+        "Combien de jours à l'avance doit le redevable informer le comptable en cas de déménagement hors du ressort du comptable ?",
+        "Quelles exceptions existent pour la taxe urbaine dans le cas d'exigibilité immédiate des créances selon l'article 19 ?",
+        "Quels changements peuvent entraîner une exigibilité immédiate des créances en vertu de l'article 19 ?",
+        "Quelle est la conséquence légale si un redevable cesse d'avoir sa résidence habituelle au Maroc ?",
+        "Quel type de transaction peut entraîner l'exigibilité immédiate des créances selon l'article 19 ?",
+        "Dans quel cas les créances peuvent-elles rester payables à terme malgré une cessation d'activité du redevable ?",
+        "Quels sont les effets légaux d'une fusion, scission ou transformation de la forme juridique d'une société sur le statut des créances selon l'article 19 ?",
+        "Comment est définie la notion de 'changement dans la personne du redevable' dans le contexte de cet article ?"
+      ]
+    },
+    {
+      "article_id": 20,
+      "questions": [
+        "Quels sont les moyens de paiement mentionnés dans l'article?",
+        "Quelle est la conséquence d'un paiement selon l'article?",
+        "Peut-on utiliser un moyen de paiement non mentionné dans l'article?",
+        "Que doit-on recevoir après avoir effectué le paiement?",
+        "Comment peut-on payer les impôts selon l'article?",
+        "Quel type de compte peut être utilisé pour le paiement des impôts?",
+        "Quelle est la nature des créances mentionnées dans l'article?",
+        "Le paiement par virement est-il mentionné comme un moyen de paiement?",
+        "Que doit-on faire en cas de paiement?",
+        "Sont-ils obligés de fournir une quittance ou une déclaration de versement?"
+      ]
+    }
+  ]
+}

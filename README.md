@@ -70,6 +70,9 @@ python src/embed.py output/extracted/codedecommerce_articles.json -f "article"
 
 # Use custom API key
 python src/embed.py output/extracted/codedecommerce_articles.json -k YOUR_API_KEY
+
+# Resume an interrupted embedding run (embed only missing records)
+python src/embed_missing.py output/embeddings/codedecommerce_embedded.json
 ```
 
 **Requirements for embedding:**

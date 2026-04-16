@@ -73,8 +73,15 @@ python src/embed.py output/extracted/codedecommerce_articles.json -k YOUR_API_KE
 ```
 
 **Requirements for embedding:**
-- Google API key (already configured in the script)
+
+- Google API key configured via `.env` (`GOOGLE_API_KEY` or `GEMINI_API_KEY`)
 - Install google-generativeai: `pip install google-generativeai`
+
+Create a `.env` file at project root:
+
+```bash
+GOOGLE_API_KEY=your_gemini_api_key_here
+```
 
 The script generates a new JSON file with an `embedding` field added to each article.
 
@@ -97,6 +104,7 @@ python src/recherche.py output/embeddings/codedecommerce_embedded.json
 ```
 
 **Features:**
+
 - **Multilingual support**: Works with French, English, and other languages via Gemini embeddings
 - Pure cosine similarity (no AI re-inference needed) - query embedding created once, compared against 841 pre-computed article embeddings
 - Configurable number of results (default: 5)
@@ -105,12 +113,14 @@ python src/recherche.py output/embeddings/codedecommerce_embedded.json
 - 3072-dimensional vector embeddings from `gemini-embedding-001` model
 
 **How it works:**
+
 1. Query is embedded once using Gemini API (3072 dims)
 2. Pre-computed article embeddings loaded from JSON (841 articles × 3072 dims)
 3. Cosine similarity calculated between query and each article embedding
 4. Results sorted by similarity score and returned
 
 **Example output (French query):**
+
 ```
 #1 - Similarity: 0.8094 (80.94%)
 Article: 18

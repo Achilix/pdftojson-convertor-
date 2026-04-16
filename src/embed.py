@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
@@ -11,7 +12,31 @@ except ImportError as exc:
 
 
 DEFAULT_MODEL = "gemini-embedding-001"  # Google's embedding model
-DEFAULT_API_KEY = "AIzaSyAYjoO7SFkrtpeGCIwLNLxMIUbVOPJXCZU"
+
+
+def _load_env_file(env_path: Path) -> None:
+	"""Load simple KEY=VALUE pairs from a local .env file into os.environ."""
+	if not env_path.exists():
+		return
+
+	with env_path.open("r", encoding="utf-8") as handle:
+		for raw_line in handle:
+			line = raw_line.strip()
+			if not line or line.startswith("#") or "=" not in line:
+				continue
+
+			key, value = line.split("=", 1)
+			key = key.strip()
+			value = value.strip().strip('"').strip("'")
+			if key and key not in os.environ:
+				os.environ[key] = value
+
+
+def _resolve_api_key(cli_api_key: str | None) -> str:
+	if cli_api_key:
+		return cli_api_key
+
+	return os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY") or ""
 
 
 def embed_text(text: str, api_key: str, model: str = DEFAULT_MODEL) -> List[float]:
@@ -41,7 +66,12 @@ def embed_text(text: str, api_key: str, model: str = DEFAULT_MODEL) -> List[floa
 		)
 		
 		if response.embeddings:
-			return list(response.embeddings[0])
+			embedding = response.embeddings[0]
+			if hasattr(embedding, "values"):
+				return list(embedding.values)
+			if isinstance(embedding, (list, tuple)):
+				return list(embedding)
+			raise RuntimeError(f"Unexpected embedding type: {type(embedding)}")
 		else:
 			print(f"Warning: No embedding returned for text: {text[:50]}...")
 			return []
@@ -128,7 +158,7 @@ def main():
 	parser.add_argument(
 		"-k", "--api-key",
 		default=None,
-		help="Google API key (or set GOOGLE_API_KEY environment variable)"
+		help="Google API key (or set GOOGLE_API_KEY / GEMINI_API_KEY in .env)"
 	)
 	parser.add_argument(
 		"-m", "--model",
@@ -142,19 +172,12 @@ def main():
 	)
 	
 	args = parser.parse_args()
-	
-	# Get API key from args or environment
-	api_key = args.api_key
-	if not api_key:
-		import os
-		api_key = os.environ.get("GOOGLE_API_KEY")
-	
-	# Fall back to default API key if not provided
-	if not api_key:
-		api_key = DEFAULT_API_KEY
+
+	_load_env_file(Path.cwd() / ".env")
+	api_key = _resolve_api_key(args.api_key)
 	
 	if not api_key:
-		print("Error: Google API key required. Use --api-key or set GOOGLE_API_KEY environment variable", file=sys.stderr)
+		print("Error: Google API key required. Use --api-key or set GOOGLE_API_KEY / GEMINI_API_KEY in .env", file=sys.stderr)
 		sys.exit(1)
 	
 	# Validate input

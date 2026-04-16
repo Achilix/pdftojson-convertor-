@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -12,7 +13,31 @@ except ImportError as exc:
 
 
 DEFAULT_MODEL = "gemini-embedding-001"
-DEFAULT_API_KEY = "AIzaSyAYjoO7SFkrtpeGCIwLNLxMIUbVOPJXCZU"
+
+
+def _load_env_file(env_path: Path) -> None:
+	"""Load simple KEY=VALUE pairs from a local .env file into os.environ."""
+	if not env_path.exists():
+		return
+
+	with env_path.open("r", encoding="utf-8") as handle:
+		for raw_line in handle:
+			line = raw_line.strip()
+			if not line or line.startswith("#") or "=" not in line:
+				continue
+
+			key, value = line.split("=", 1)
+			key = key.strip()
+			value = value.strip().strip('"').strip("'")
+			if key and key not in os.environ:
+				os.environ[key] = value
+
+
+def _resolve_api_key(cli_api_key: str | None) -> str:
+	if cli_api_key:
+		return cli_api_key
+
+	return os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY") or ""
 
 
 def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
@@ -205,7 +230,7 @@ def main():
 	parser.add_argument(
 		"-a", "--api-key",
 		default=None,
-		help="Google API key (or set GOOGLE_API_KEY environment variable)"
+		help="Google API key (or set GOOGLE_API_KEY / GEMINI_API_KEY in .env)"
 	)
 	parser.add_argument(
 		"-m", "--model",
@@ -222,14 +247,10 @@ def main():
 		sys.exit(1)
 	
 	# Get API key
-	api_key = args.api_key
+	_load_env_file(Path.cwd() / ".env")
+	api_key = _resolve_api_key(args.api_key)
 	if not api_key:
-		import os
-		api_key = os.environ.get("GOOGLE_API_KEY")
-	if not api_key:
-		api_key = DEFAULT_API_KEY
-	if not api_key:
-		print("Error: Google API key required", file=sys.stderr)
+		print("Error: Google API key required. Use --api-key or set GOOGLE_API_KEY / GEMINI_API_KEY in .env", file=sys.stderr)
 		sys.exit(1)
 	
 	# Get query

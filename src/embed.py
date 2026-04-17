@@ -94,6 +94,7 @@ def embed_articles(
 	api_key: str,
 	model: str = DEFAULT_MODEL,
 	text_field: str = "content",
+	checkpoint_every: int = 0,
 ) -> None:
 	"""Load articles from JSON, embed content, and save results."""
 	articles = _load_articles_json(input_path)
@@ -118,6 +119,12 @@ def embed_articles(
 		except Exception as exc:
 			print(f"FAILED: {str(exc)[:120]}")
 			embedded_articles.append(article)
+
+		if checkpoint_every > 0 and i % checkpoint_every == 0:
+			output_path.parent.mkdir(parents=True, exist_ok=True)
+			with output_path.open("w", encoding="utf-8") as handle:
+				json.dump(embedded_articles, handle, ensure_ascii=False, indent=2)
+			print(f"Checkpoint saved: {output_path}")
 
 	output_path.parent.mkdir(parents=True, exist_ok=True)
 	with output_path.open("w", encoding="utf-8") as handle:
@@ -156,6 +163,12 @@ def main() -> None:
 		default="content",
 		help="Field name to extract text from (default: content)",
 	)
+	parser.add_argument(
+		"--checkpoint-every",
+		type=int,
+		default=0,
+		help="Save output every N processed articles (default: 0, disabled)",
+	)
 
 	args = parser.parse_args()
 	_load_env_file(Path.cwd() / ".env")
@@ -176,11 +189,18 @@ def main() -> None:
 	if args.output:
 		output_path = args.output.resolve()
 	else:
-		output_path = input_path.parent / f"{input_path.stem}_embedded.json"
+		output_path = Path.cwd() / "output" / "embeddings" / f"{input_path.stem}_embedded.json"
 
 	print(f"Model: {args.model}")
 	print(f"Text field: {args.field}\n")
-	embed_articles(input_path, output_path, api_key, args.model, args.field)
+	embed_articles(
+		input_path,
+		output_path,
+		api_key,
+		args.model,
+		args.field,
+		max(0, args.checkpoint_every),
+	)
 
 
 if __name__ == "__main__":

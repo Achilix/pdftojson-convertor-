@@ -75,6 +75,9 @@ python src/embed.py output/extracted/codedecommerce_articles.json -k YOUR_API_KE
 python src/embed_missing.py output/embeddings/codedecommerce_embedded.json
 ```
 
+`embed.py` writes to `output/embeddings/<input_stem>_embedded.json` by default when `-o` is not provided.
+`embed_missing.py` overwrites the input JSON by default when `-o` is not provided.
+
 **Requirements for embedding:**
 
 - Google API key configured via `.env` (`GOOGLE_API_KEY` or `GEMINI_API_KEY`)
@@ -87,6 +90,33 @@ GOOGLE_API_KEY=your_gemini_api_key_here
 ```
 
 The script generates a new JSON file with an `embedding` field added to each article.
+
+#### Semantic Chunking Inside Articles
+
+The `semantic_chunk.py` script chunks each article into semantically coherent chunks while preserving hierarchy metadata (`livre`, `titre`, `chapitre`, `section`, `sous_section`) from extraction output.
+
+```bash
+# Basic usage
+python src/semantic_chunk.py output/extracted/codedecommerce_articles.json
+
+# Custom output
+python src/semantic_chunk.py output/extracted/codedecommerce_articles.json -o output/chunks/codedecommerce_semantic_chunks.json
+
+# Tune chunking behavior
+python src/semantic_chunk.py output/extracted/codedecommerce_articles.json --target-chars 800 --max-chars 1300 --similarity-threshold 0.70
+
+# Enable checkpoints every 5 articles
+python src/semantic_chunk.py output/extracted/codedecommerce_articles.json --checkpoint-every 5
+
+# Resume from latest checkpoint
+python src/resume_semantic_chunk.py output/extracted/codedecommerce_articles.json
+```
+
+By default it writes:
+
+- `output/chunks/<input_stem>_semantic_chunks.json`
+- `output/chunks/<input_stem>_semantic_chunks.csv`
+- Checkpoints in `output/chunks/checkpoints/<input_stem>/`
 
 #### Semantic Search Using Cosine Similarity
 

@@ -36,7 +36,11 @@ def _resolve_api_key(cli_api_key: str | None) -> str:
 	if cli_api_key:
 		return cli_api_key
 
-	return os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY") or ""
+	return (
+		os.environ.get("GOOGLE_API_KEY")
+		or os.environ.get("GEMINI_API_KEY")
+		or ""
+	)
 
 
 def embed_text(text: str, api_key: str, model: str = DEFAULT_MODEL) -> List[float]:

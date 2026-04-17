@@ -43,7 +43,11 @@ def _load_env_file(env_path: Path) -> None:
 def _resolve_api_key(cli_api_key: str | None) -> str:
 	if cli_api_key:
 		return cli_api_key
-	return os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY") or ""
+	return (
+		os.environ.get("GOOGLE_API_KEY")
+		or os.environ.get("GEMINI_API_KEY")
+		or ""
+	)
 
 
 def _load_articles(input_path: Path) -> List[Dict[str, Any]]:

@@ -29,6 +29,13 @@ INLINE_FOOTNOTE_SPLIT_RE = re.compile(
 INLINE_PAREN_FOOTNOTE_SPLIT_RE = re.compile(
 	r"(?i)\s+\(\d{1,2}\)\s*(?:l['’]emploi|le\s+ministre\s+d['’]etat|sont\s+abrog[ée]es|dans\s+les\s+cas\s+o[uù]|modifi[ée]|ajout[ée]|article\s+\d+\s*[—-])"
 )
+HEADER_FOOTER_LINE_PATTERNS = (
+	re.compile(r"(?i)^\s*public\s*$"),
+	re.compile(r"(?i)^\s*recueil\s+des\s+textes\s+l[ée]gislatifs\b.*$"),
+	re.compile(r"(?i)^\s*mis\s+[àa]\s+jour\b.*$"),
+	re.compile(r"(?i)^\s*\d+\s*\.\s*statut\s+de\s+bank\s+al[\s-]?maghrib\b.*$"),
+	re.compile(r"(?i)^\s*publi[ée]\s+au\s+bulletin\s+officiel\b.*$"),
+)
 SKIP_ARTICLE_PREV_LINE_RE = re.compile(
 	r"(?im)(?:\bVoir\s+articles?\b|pr[ée]cit[ée]e?\.\s*$)"
 )
@@ -55,13 +62,19 @@ def _load_pymupdf_document(pdf_path: Path):
 def _extract_page_structure(
 	pdf_path: Path,
 	allow_unlabeled_sous_section: bool = False,
+	max_pages: int = 0,
 ) -> Tuple[str, List[Tuple[int, int, int]], List[Tuple[int, str, str]]]:
 	"""Extract raw text, page ranges, and hierarchy events from a PDF using PyMuPDF."""
 	doc = _load_pymupdf_document(pdf_path)
 	pages_data: List[Dict[str, object]] = []
 	line_sizes: List[float] = []
 
-	for page_num, page in enumerate(doc, start=1):
+	if max_pages > 0:
+		page_iterable = enumerate(doc[:max_pages], start=1)
+	else:
+		page_iterable = enumerate(doc, start=1)
+
+	for page_num, page in page_iterable:
 		page_dict = page.get_text("dict")
 		page_lines: List[Dict[str, object]] = []
 
@@ -121,22 +134,23 @@ def _extract_page_structure(
 			if idx + 1 < len(lines):
 				next_text = str(lines[idx + 1]["text"])
 
-			continuation = _extract_heading_continuation(next_text)
-
 			if _is_livre_heading(text, spans, line_size, body_size, livre_size_threshold):
 				heading_value = _normalize_hierarchy_heading("livre", text)
+				continuation = _extract_heading_continuation(next_text, "livre")
 				if continuation is not None:
 					heading_value = _normalize_hierarchy_heading("livre", f"{heading_value} {continuation}")
 					consumed_next_heading_line = True
 				hierarchy_events.append((line_cursor, "livre", heading_value))
 			elif _is_titre_heading(text, spans, line_size, body_size, titre_size_threshold):
 				heading_value = _normalize_hierarchy_heading("titre", text)
+				continuation = _extract_heading_continuation(next_text, "titre")
 				if continuation is not None:
 					heading_value = _normalize_hierarchy_heading("titre", f"{heading_value} {continuation}")
 					consumed_next_heading_line = True
 				hierarchy_events.append((line_cursor, "titre", heading_value))
 			elif _is_chapitre_heading(text, spans, line_size, body_size, section_size_threshold):
 				heading_value = _normalize_hierarchy_heading("chapitre", text)
+				continuation = _extract_heading_continuation(next_text, "chapitre")
 				if continuation is not None:
 					heading_value = _normalize_hierarchy_heading("chapitre", f"{heading_value} {continuation}")
 					consumed_next_heading_line = True
@@ -160,6 +174,7 @@ def _extract_page_structure(
 				allow_unlabeled_sous_section=allow_unlabeled_sous_section,
 			):
 				heading_value = _normalize_hierarchy_heading("section", text)
+				continuation = _extract_heading_continuation(next_text, "section")
 				if continuation is not None:
 					heading_value = _normalize_hierarchy_heading("section", f"{heading_value} {continuation}")
 					consumed_next_heading_line = True
@@ -338,13 +353,39 @@ def _line_starts_with(text: str, keyword: str) -> bool:
 	return re.match(rf"(?i)^\s*{re.escape(keyword)}\b", text) is not None
 
 
-def _extract_heading_continuation(next_text: str) -> str | None:
+def _is_probable_header_footer_line(text: str) -> bool:
+	normalized = _normalize_heading(text)
+	if not normalized:
+		return False
+
+	if PAGE_NUMBER_LINE_RE.match(normalized):
+		return True
+
+	for pattern in HEADER_FOOTER_LINE_PATTERNS:
+		if pattern.match(normalized):
+			return True
+
+	if re.match(r"(?i)^\s*\d+\s*\.\s+[A-ZÀ-ÖØ-Þ\s'’\-]{8,}\s*$", normalized):
+		return True
+
+	return False
+
+
+def _is_uppercase_heading_fragment(text: str) -> bool:
+	letters = [ch for ch in text if ch.isalpha()]
+	if len(letters) < 8:
+		return False
+	upper_count = sum(1 for ch in letters if ch.isupper())
+	return (upper_count / len(letters)) >= 0.75
+
+
+def _extract_heading_continuation(next_text: str, level: str) -> str | None:
 	"""Return a heading continuation line (e.g., "De ...") if it looks like a title fragment."""
 	normalized = _normalize_heading(next_text)
 	if not normalized:
 		return None
 
-	if PAGE_NUMBER_LINE_RE.match(normalized):
+	if _is_probable_header_footer_line(normalized):
 		return None
 
 	if FOOTNOTE_LINE_RE.match(normalized):
@@ -357,9 +398,12 @@ def _extract_heading_continuation(next_text: str) -> str | None:
 		return None
 
 	if re.match(r"(?i)^(de(?:\s+l['’]?)?|des|du|d['’])\b", normalized) is None:
-		return None
+		if level not in {"livre", "titre", "chapitre", "section"}:
+			return None
+		if not _is_uppercase_heading_fragment(normalized):
+			return None
 
-	if len(normalized) > 130:
+	if len(normalized) > 160:
 		return None
 
 	return normalized
@@ -458,6 +502,9 @@ def _strip_footnotes_from_content(content: str) -> str:
 			continue
 
 		if PAGE_NUMBER_LINE_RE.match(normalized):
+			continue
+
+		if _is_probable_header_footer_line(normalized):
 			continue
 
 		if _is_probable_footnote_line(normalized):
@@ -832,12 +879,13 @@ def _extract_articles(
 	return articles
 
 
-def process_pdf_to_outputs(pdf_path: Path, output_dir: Path) -> Tuple[Path, Path]:
+def process_pdf_to_outputs(pdf_path: Path, output_dir: Path, max_pages: int = 0) -> Tuple[Path, Path]:
 	"""Parse one PDF and write extracted articles as JSON and CSV in output directory."""
 	allow_unlabeled_sous_section = re.search(r"(?i)dahir", pdf_path.stem) is not None
 	raw_text, page_ranges, hierarchy_events = _extract_page_structure(
 		pdf_path,
 		allow_unlabeled_sous_section=allow_unlabeled_sous_section,
+		max_pages=max(0, max_pages),
 	)
 	try:
 		source_relative_path = pdf_path.relative_to(Path.cwd()).as_posix()
@@ -853,8 +901,13 @@ def process_pdf_to_outputs(pdf_path: Path, output_dir: Path) -> Tuple[Path, Path
 	)
 
 	output_dir.mkdir(parents=True, exist_ok=True)
-	json_file = output_dir / f"{pdf_path.stem}_articles.json"
-	csv_file = output_dir / f"{pdf_path.stem}_articles.csv"
+	if max_pages > 0:
+		suffix = f"_first_{max_pages}p_articles"
+	else:
+		suffix = "_articles"
+
+	json_file = output_dir / f"{pdf_path.stem}{suffix}.json"
+	csv_file = output_dir / f"{pdf_path.stem}{suffix}.csv"
 
 	with json_file.open("w", encoding="utf-8") as f:
 		json.dump(articles, f, ensure_ascii=False, indent=2)
@@ -907,6 +960,12 @@ def main() -> None:
 		default="output/extracted",
 		help="Directory to write JSON output files (default: output/extracted).",
 	)
+	parser.add_argument(
+		"--max-pages",
+		type=int,
+		default=0,
+		help="Only process the first N pages (default: 0, process all pages).",
+	)
 	args = parser.parse_args()
 
 	output_dir = Path(args.output_dir)
@@ -924,7 +983,7 @@ def main() -> None:
 			print(f"Skipping missing file: {pdf_path}")
 			continue
 
-		json_file, csv_file = process_pdf_to_outputs(pdf_path, output_dir)
+		json_file, csv_file = process_pdf_to_outputs(pdf_path, output_dir, max_pages=max(0, args.max_pages))
 		print(f"Processed {pdf_path} -> {json_file} and {csv_file}")
 
 

@@ -344,22 +344,28 @@ def semantic_chunk_articles(
 	if start_article_index > 0:
 		print(f"Resuming from article index {start_article_index + 1}")
 
+	failures = 0
+
 	for idx in range(start_article_index, len(articles)):
 		article = articles[idx]
 		article_number = article.get("article_number") or article.get("article") or "unknown"
 		print(f"[{idx + 1}/{len(articles)}] Chunking article {article_number}...", flush=True)
-		article_chunks = _chunk_article_semantically(
-			article=article,
-			client=client,
-			model=model,
-			text_field=text_field,
-			target_chars=target_chars,
-			max_chars=max_chars,
-			similarity_threshold=similarity_threshold,
-			max_retries=max_retries,
-			pause_seconds=pause_seconds,
-		)
-		all_chunks.extend(article_chunks)
+		try:
+			article_chunks = _chunk_article_semantically(
+				article=article,
+				client=client,
+				model=model,
+				text_field=text_field,
+				target_chars=target_chars,
+				max_chars=max_chars,
+				similarity_threshold=similarity_threshold,
+				max_retries=max_retries,
+				pause_seconds=pause_seconds,
+			)
+			all_chunks.extend(article_chunks)
+		except Exception as exc:
+			failures += 1
+			print(f"[{idx + 1}/{len(articles)}] FAILED article {article_number}: {str(exc)[:220]}")
 
 		next_article_index = idx + 1
 		if checkpoint_dir and checkpoint_every > 0 and (next_article_index % checkpoint_every == 0):
@@ -391,6 +397,8 @@ def semantic_chunk_articles(
 
 	print(f"\nSaved {len(all_chunks)} semantic chunk(s) to {output_path}")
 	print(f"Saved CSV to {output_path.with_suffix('.csv')}")
+	if failures > 0:
+		print(f"Chunking completed with {failures} failed article(s).")
 
 
 def main() -> None:

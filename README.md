@@ -1,46 +1,21 @@
-# PDF Articles Pipeline
+# PDF Legal Pipeline
 
-This project processes legal PDF corpora end-to-end:
+This repository extracts legal articles from PDFs and supports downstream processing:
 
-1. Extract articles and hierarchy metadata from PDF files.
-2. Add stable IDs.
-3. Generate study questions.
-4. Build semantic chunks.
-5. Build embeddings and run semantic search.
+1. Extraction (`src/app.py`)
+2. ID assignment (`src/add_ids.py`)
+3. Question generation (`src/generate_questions.py`)
+4. Semantic chunking (`src/semantic_chunk.py`)
+5. Embedding (`src/embed.py`, `src/embed_missing.py`)
+6. Semantic search (`src/recherche.py`)
 
-## Project Structure
+All commands below assume you run them from the project root.
 
-```text
-project/
-  src/
-    app.py
-    add_ids.py
-    generate_questions.py
-    semantic_chunk.py
-    embed.py
-    embed_missing.py
-    recherche.py
-    pipeline_extract_semantic.py
-  pdfs/
-  output/
-    extracted/
-    with_ids/
-    questions/
-    chunks/
-    embeddings/
-```
+## Python and Dependencies
 
-## Requirements
+Current project runtime in this workspace: Python 3.14.0.
 
-- Python 3.10+
-- Packages:
-  - pandas
-  - pymupdf
-  - requests
-  - google-genai
-  - numpy
-
-Install:
+Install dependencies:
 
 ```bash
 pip install pandas pymupdf requests google-genai numpy
@@ -48,47 +23,59 @@ pip install pandas pymupdf requests google-genai numpy
 
 ## Environment Variables
 
-For Gemini-based scripts (`semantic_chunk.py`, `embed.py`, `embed_missing.py`, `recherche.py`):
+Gemini-based scripts require one of:
 
-- `GOOGLE_API_KEY` or `GEMINI_API_KEY`
+- `GOOGLE_API_KEY`
+- `GEMINI_API_KEY`
 
-For question generation (`generate_questions.py` + Ollama):
+Ollama-based question generation can use:
 
-- `OLLAMA_BASE_URL` (optional, default: `http://localhost:11434`)
-- `OLLAMA_MODEL` (optional, default: `qwen2.5:latest`)
+- `OLLAMA_BASE_URL` (default: `http://localhost:11434`)
+- `OLLAMA_MODEL` (default: `qwen2.5:latest`)
 
-Notes:
+Where variables are loaded from:
 
-- Most scripts load `.env` from project root when run from root.
-- `generate_questions.py` also loads `src/.env`.
+- `src/semantic_chunk.py`, `src/embed.py`, `src/embed_missing.py`, `src/recherche.py` load `.env` from current working directory.
+- `src/generate_questions.py` loads `src/.env` (and also reads already-exported environment variables).
 
-## Step-by-Step Workflow
+## Defaults (No Ambiguity)
 
-### 1) Extract Articles From PDFs
+### `src/app.py`
 
-Process all PDFs in `pdfs/`:
+- Default `--pdf-dir`: `pdfs`
+- Default `--output-dir`: `output/extracted`
+- Default `--max-pages`: `0` (all pages)
+
+### `src/semantic_chunk.py`
+
+- Input can be extracted JSON or PDF.
+- If input is PDF, extraction is run first.
+- Default `--max-pages`: `0` (all pages)
+- Default checkpoint frequency: every `50` articles
+
+## Typical Workflow
+
+### 1) Extract articles from PDFs
+
+All PDFs in `pdfs/`:
 
 ```bash
 python src/app.py
 ```
 
-Process one PDF:
+Single PDF:
 
 ```bash
 python src/app.py --pdf "pdfs/codedecommerce.pdf"
 ```
 
-Optional page limit:
+First N pages only:
 
 ```bash
 python src/app.py --pdf "pdfs/codedecommerce.pdf" --max-pages 50
 ```
 
-Important default:
-
-- `--max-pages 0` means all pages (no page cap).
-
-Default extraction outputs:
+Outputs per PDF:
 
 - `output/extracted/<pdf_stem>_articles.json`
 - `output/extracted/<pdf_stem>_articles.csv`
@@ -108,26 +95,71 @@ Extraction columns:
 
 ### 2) Add IDs
 
-Process all `*_articles.json` files in a folder:
+Directory input (`*_articles.json` files):
 
 ```bash
 python src/add_ids.py output/extracted --output-dir output/with_ids
 ```
 
-Process one file:
+Single file:
 
 ```bash
 python src/add_ids.py output/extracted/codedecommerce_articles.json --output-dir output/with_ids
 ```
 
-Outputs:
+Output names:
 
 - `*_with_ids.json`
 - `*_with_ids.csv`
 
-### 3) Generate Questions
+### 3) Semantic chunking
 
-`generate_questions.py` accepts a single JSON file per run.
+From extracted JSON:
+
+```bash
+python src/semantic_chunk.py output/extracted/codedecommerce_articles.json
+```
+
+Directly from PDF (extract + chunk in one command):
+
+```bash
+python src/semantic_chunk.py "pdfs/codedecommerce.pdf"
+```
+
+Force first 50 pages only:
+
+```bash
+python src/semantic_chunk.py "pdfs/codedecommerce.pdf" --max-pages 50
+```
+
+Resume from latest checkpoint:
+
+```bash
+python src/semantic_chunk.py output/extracted/codedecommerce_articles.json --resume
+```
+
+Clean existing semantic chunks JSON and rewrite JSON+CSV:
+
+```bash
+python src/semantic_chunk.py output/chunks/codedecommerce_articles_semantic_chunks.json --clean
+```
+
+Default chunk outputs:
+
+- `output/chunks/<input_stem>_semantic_chunks.json`
+- `output/chunks/<input_stem>_semantic_chunks.csv`
+- `output/chunks/checkpoints/<input_stem>/...`
+
+Chunk columns:
+
+- `chunk_id`, `chunk_index`, `chunk_count`
+- `article_number`, `document_name`
+- `livre`, `titre`, `chapitre`, `section`, `sous_section`
+- `pages`, `source_relative_path`, `content`
+
+### 4) Generate questions (Ollama)
+
+`generate_questions.py` expects one JSON file per run.
 
 ```bash
 python src/generate_questions.py output/with_ids/codedecommerce_articles_with_ids.json --output-dir output/questions
@@ -137,107 +169,50 @@ Outputs:
 
 - `output/questions/<input_stem>_questions.json`
 - `output/questions/<input_stem>_questions.csv`
-- intermediate batch files in `output/questions/<input_stem>_batches/`
+- batch files in `output/questions/<input_stem>_batches/`
 
-### 4) Semantic Chunking
+### 5) Build embeddings
 
-Chunk from extracted JSON:
-
-```bash
-python src/semantic_chunk.py output/extracted/codedecommerce_articles.json
-```
-
-Chunk directly from PDF (extract + chunk in one command):
-
-```bash
-python src/semantic_chunk.py "pdfs/codedecommerce.pdf"
-```
-
-Important default:
-
-- `semantic_chunk.py --max-pages` now defaults to `0` (all pages).
-- There is no default 50-page cap.
-
-If you want a limit, pass it explicitly:
-
-```bash
-python src/semantic_chunk.py "pdfs/codedecommerce.pdf" --max-pages 50
-```
-
-Useful options:
-
-```bash
-# Tune chunk behavior
-python src/semantic_chunk.py output/extracted/codedecommerce_articles.json --target-chars 800 --max-chars 1300 --similarity-threshold 0.70
-
-# Save checkpoints every N articles (default is 50)
-python src/semantic_chunk.py output/extracted/codedecommerce_articles.json --checkpoint-every 50
-
-# Resume from latest checkpoint
-python src/semantic_chunk.py output/extracted/codedecommerce_articles.json --resume
-
-# Clean an existing semantic chunks JSON and regenerate CSV
-python src/semantic_chunk.py output/chunks/codedecommerce_articles_semantic_chunks.json --clean
-```
-
-Default chunk outputs:
-
-- `output/chunks/<input_stem>_semantic_chunks.json`
-- `output/chunks/<input_stem>_semantic_chunks.csv`
-- checkpoints: `output/chunks/checkpoints/<input_stem>/`
-
-Chunk rows include:
-
-- `chunk_id`, `chunk_index`, `chunk_count`
-- `document_name`, `article_number`
-- `livre`, `titre`, `chapitre`, `section`, `sous_section`
-- `pages`, `content`, `source_relative_path`
-
-### 5) Build Embeddings
+Embed all records in a JSON file:
 
 ```bash
 python src/embed.py output/extracted/codedecommerce_articles.json
 ```
 
-Custom output:
+Default output (if `-o` not set):
+
+- `output/embeddings/<input_stem>_embedded.json`
+
+Fill only missing embeddings:
 
 ```bash
-python src/embed.py output/extracted/codedecommerce_articles.json -o output/embeddings/codedecommerce_embedded.json
+python src/embed_missing.py output/embeddings/codedecommerce_articles_embedded.json
 ```
 
-Resume only missing embeddings:
+`embed_missing.py` overwrites input by default when `-o` is not provided.
+
+### 6) Semantic search
 
 ```bash
-python src/embed_missing.py output/embeddings/codedecommerce_embedded.json
-```
-
-### 6) Semantic Search
-
-```bash
-python src/recherche.py output/embeddings/codedecommerce_embedded.json -q "obligation d'ouvrir un compte"
-```
-
-Optional filters:
-
-```bash
-python src/recherche.py output/embeddings/codedecommerce_embedded.json -q "compte bancaire" -k 10 -t 0.5
-```
-
-## Optional One-Command Extract + Chunk Pipeline
-
-If you prefer a dedicated wrapper:
-
-```bash
-python src/pipeline_extract_semantic.py "pdfs/codedecommerce.pdf"
+python src/recherche.py output/embeddings/codedecommerce_articles_embedded.json -q "obligation d'ouvrir un compte"
 ```
 
 ## Troubleshooting
 
-- If imports fail, reinstall dependencies:
+### `semantic_chunk.py` exits with code 1 after starting
 
-```bash
-pip install --upgrade pandas pymupdf requests google-genai numpy
-```
+Most common cause is Gemini quota/rate limit (for example `429 RESOURCE_EXHAUSTED`).
 
-- If Gemini scripts fail, verify `GOOGLE_API_KEY` or `GEMINI_API_KEY` is set.
-- If question generation fails, verify Ollama is running and reachable at `OLLAMA_BASE_URL`.
+What to do:
+
+1. Check API quota/billing for the key.
+2. Retry with reduced load (smaller file or lower page count).
+3. Keep checkpoints enabled and resume with `--resume`.
+
+### Missing API key errors
+
+Set `GOOGLE_API_KEY` or `GEMINI_API_KEY`, or pass `--api-key`.
+
+### Extraction finds no PDFs
+
+Verify `pdfs/` exists or pass explicit `--pdf` / `--pdf-dir`.

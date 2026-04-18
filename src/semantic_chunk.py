@@ -1,4 +1,5 @@
 import argparse
+from collections import defaultdict
 import json
 import os
 import random
@@ -18,6 +19,7 @@ except ImportError as exc:
 
 
 DEFAULT_MODEL = "gemini-embedding-001"
+DEFAULT_CHECKPOINT_EVERY = 50
 RETRYABLE_HINTS = (
 	"429",
 	"500",
@@ -29,6 +31,7 @@ RETRYABLE_HINTS = (
 	"deadline",
 	"timeout",
 )
+FOOTER_ONLY_RE = re.compile(r"^\s*\d+\s*[\u00ad\-–—]*\s*$")
 
 
 def _load_env_file(env_path: Path) -> None:
@@ -103,6 +106,111 @@ def _cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
 
 def _normalize_spaces(text: str) -> str:
 	return re.sub(r"\s+", " ", text).strip()
+
+
+def _clean_chunk_content(text: str) -> str:
+	if not text:
+		return ""
+
+	cleaned = text.replace("\u0007", " ")
+
+	for marker in (
+		"2.CADRE RELATIF AUX ETABLISSEMENTS DE CREDIT",
+		"LOUANGE A DIEU SEUL",
+		"A décidé ce qui suit",
+	):
+		idx = cleaned.find(marker)
+		if idx != -1:
+			cleaned = cleaned[:idx]
+
+	cleaned = re.sub(
+		r"\s*\d+\s+Publié au Bulletin officiel.*?(?=(?:\s+-\s)|$)",
+		" ",
+		cleaned,
+		flags=re.IGNORECASE,
+	)
+	cleaned = re.sub(
+		r"\s*\d+\s+Les dispositions de l[’']article.*?(?=(?:\s+-\s)|$)",
+		" ",
+		cleaned,
+		flags=re.IGNORECASE,
+	)
+	cleaned = re.sub(
+		r"\s*Ledit Dahir.*?(?=(?:\s+-\s)|$)",
+		" ",
+		cleaned,
+		flags=re.IGNORECASE,
+	)
+	cleaned = re.sub(
+		r"\s*\d+\s+L[’']article.*$",
+		" ",
+		cleaned,
+		flags=re.IGNORECASE,
+	)
+	cleaned = re.sub(r"\s+\d+\s*[\u00ad\-–—]?\s*$", "", cleaned)
+
+	return _normalize_spaces(cleaned)
+
+
+def normalize_chunks(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+	kept: List[Dict[str, Any]] = []
+	for row in rows:
+		row.pop("article_id", None)
+		content = _clean_chunk_content(str(row.get("content", "")))
+		if not content:
+			continue
+		if FOOTER_ONLY_RE.match(content):
+			continue
+		row["content"] = content
+		kept.append(row)
+
+	group_key = lambda r: (
+		r.get("document_name", ""),
+		r.get("livre", ""),
+		r.get("titre", ""),
+		r.get("chapitre", ""),
+		r.get("section", ""),
+		r.get("sous_section", ""),
+		r.get("article_number", ""),
+	)
+
+	grouped: Dict[tuple, List[Dict[str, Any]]] = defaultdict(list)
+	for row in kept:
+		grouped[group_key(row)].append(row)
+
+	group_id_by_key: Dict[tuple, int] = {}
+	next_group_id = 1
+	for row in kept:
+		key = group_key(row)
+		if key not in group_id_by_key:
+			group_id_by_key[key] = next_group_id
+			next_group_id += 1
+
+	for key, rows_in_group in grouped.items():
+		total = len(rows_in_group)
+		group_id = group_id_by_key[key]
+		article_number = str(rows_in_group[0].get("article_number", "")).strip() or "unknown"
+		for idx, row in enumerate(rows_in_group, start=1):
+			row["chunk_index"] = idx
+			row["chunk_count"] = total
+			row["chunk_id"] = f"{article_number}_{idx:03d}_g{group_id:03d}"
+
+	return kept
+
+
+def clean_semantic_chunks_file(input_path: Path, output_path: Path) -> None:
+	with input_path.open("r", encoding="utf-8") as handle:
+		payload = json.load(handle)
+
+	if not isinstance(payload, list):
+		raise ValueError(f"Expected a JSON array in {input_path}")
+
+	rows = [item for item in payload if isinstance(item, dict)]
+	cleaned_rows = normalize_chunks(rows)
+
+	_write_final_outputs(output_path, cleaned_rows)
+	print(f"Cleaned {len(cleaned_rows)} semantic chunk(s) -> {output_path}")
+	print(f"Cleaned CSV -> {output_path.with_suffix('.csv')}")
 
 
 def _split_long_sentence(text: str, max_chars: int) -> List[str]:
@@ -194,7 +302,6 @@ def _chunk_article_semantically(
 	if current_sentences:
 		chunks.append({"text": " ".join(current_sentences).strip()})
 
-	article_id = article.get("id")
 	article_number = article.get("article_number") or article.get("article") or "unknown"
 	total_chunks = len(chunks)
 	final_chunks: List[Dict[str, Any]] = []
@@ -203,7 +310,6 @@ def _chunk_article_semantically(
 			"chunk_id": f"{article_number}_{index:03d}",
 			"chunk_index": index,
 			"chunk_count": total_chunks,
-			"article_id": article_id,
 			"article_number": article_number,
 			"document_name": article.get("document_name", ""),
 			"livre": article.get("livre", ""),
@@ -238,7 +344,6 @@ def _write_final_outputs(output_path: Path, chunks: List[Dict[str, Any]]) -> Non
 			"chunk_id",
 			"chunk_index",
 			"chunk_count",
-			"article_id",
 			"article_number",
 			"document_name",
 			"livre",
@@ -303,6 +408,12 @@ def load_checkpoint(checkpoint_path: Path) -> Dict[str, Any]:
 	return payload
 
 
+def _pick_setting(checkpoint_settings: Dict[str, Any], key: str, cli_value: Any) -> Any:
+	if cli_value is not None:
+		return cli_value
+	return checkpoint_settings.get(key)
+
+
 def semantic_chunk_articles(
 	input_path: Path,
 	output_path: Path,
@@ -315,7 +426,7 @@ def semantic_chunk_articles(
 	max_retries: int,
 	pause_seconds: float,
 	checkpoint_dir: Optional[Path] = None,
-	checkpoint_every: int = 5,
+	checkpoint_every: int = DEFAULT_CHECKPOINT_EVERY,
 	start_article_index: int = 0,
 	seed_chunks: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
@@ -405,7 +516,7 @@ def main() -> None:
 	parser = argparse.ArgumentParser(
 		description="Semantically chunk extracted article JSON while preserving hierarchy metadata."
 	)
-	parser.add_argument("input", type=Path, help="Input articles JSON file")
+	parser.add_argument("input", type=Path, help="Input articles JSON file or PDF file")
 	parser.add_argument(
 		"-o",
 		"--output",
@@ -422,43 +533,43 @@ def main() -> None:
 	parser.add_argument(
 		"-m",
 		"--model",
-		default=DEFAULT_MODEL,
-		help=f"Embedding model name (default: {DEFAULT_MODEL})",
+		default=None,
+		help=f"Embedding model name (default: {DEFAULT_MODEL}; on --resume uses checkpoint setting)",
 	)
 	parser.add_argument(
 		"-f",
 		"--field",
-		default="content",
-		help="Article field to chunk (default: content)",
+		default=None,
+		help="Article field to chunk (default: content; on --resume uses checkpoint setting)",
 	)
 	parser.add_argument(
 		"--target-chars",
 		type=int,
-		default=900,
+		default=None,
 		help="Preferred chunk size in characters before semantic split decisions (default: 900)",
 	)
 	parser.add_argument(
 		"--max-chars",
 		type=int,
-		default=1400,
+		default=None,
 		help="Hard max chunk size in characters (default: 1400)",
 	)
 	parser.add_argument(
 		"--similarity-threshold",
 		type=float,
-		default=0.72,
+		default=None,
 		help="Cosine similarity threshold for keeping adjacent sentences together (default: 0.72)",
 	)
 	parser.add_argument(
 		"--max-retries",
 		type=int,
-		default=5,
+		default=None,
 		help="Retries for transient API errors (default: 5)",
 	)
 	parser.add_argument(
 		"--pause",
 		type=float,
-		default=0.15,
+		default=None,
 		help="Pause in seconds between API calls (default: 0.15)",
 	)
 	parser.add_argument(
@@ -470,20 +581,70 @@ def main() -> None:
 	parser.add_argument(
 		"--checkpoint-every",
 		type=int,
-		default=5,
-		help="Save checkpoint every N processed articles (default: 5)",
+		default=None,
+		help=f"Save checkpoint every N processed articles (default: {DEFAULT_CHECKPOINT_EVERY})",
+	)
+	parser.add_argument(
+		"--max-pages",
+		type=int,
+		default=50,
+		help="When input is a PDF, extract only first N pages before chunking (default: 50)",
+	)
+	parser.add_argument(
+		"--extract-output-dir",
+		type=Path,
+		default=Path("output/extracted"),
+		help="When input is a PDF, directory for extracted articles JSON/CSV",
+	)
+	parser.add_argument(
+		"--resume",
+		action="store_true",
+		help="Resume from latest checkpoint for the given input articles JSON",
+	)
+	parser.add_argument(
+		"--clean",
+		action="store_true",
+		help="Clean an existing semantic chunks JSON file and regenerate CSV",
 	)
 	args = parser.parse_args()
+
+	input_path = args.input.resolve()
+	if not input_path.exists():
+		print(f"Error: Input file not found: {input_path}", file=sys.stderr)
+		sys.exit(1)
+
+	if input_path.suffix.lower() == ".pdf":
+		if args.clean:
+			print("Error: --clean requires a semantic chunks JSON file, not a PDF.", file=sys.stderr)
+			sys.exit(1)
+		if args.resume:
+			print("Error: --resume requires extracted articles JSON, not a PDF.", file=sys.stderr)
+			sys.exit(1)
+
+		from app import process_pdf_to_outputs
+
+		extract_output_dir = args.extract_output_dir.resolve()
+		extracted_json, extracted_csv = process_pdf_to_outputs(
+			pdf_path=input_path,
+			output_dir=extract_output_dir,
+			max_pages=max(0, args.max_pages),
+		)
+		print(f"Extraction done -> {extracted_json}")
+		print(f"Extraction CSV -> {extracted_csv}")
+		input_path = extracted_json
+
+	if args.clean:
+		if args.output:
+			output_path = args.output.resolve()
+		else:
+			output_path = input_path
+		clean_semantic_chunks_file(input_path=input_path, output_path=output_path)
+		return
 
 	_load_env_file(Path.cwd() / ".env")
 	api_key = _resolve_api_key(args.api_key)
 	if not api_key:
 		print("Error: Google API key required. Use --api-key or set GOOGLE_API_KEY / GEMINI_API_KEY in .env", file=sys.stderr)
-		sys.exit(1)
-
-	input_path = args.input.resolve()
-	if not input_path.exists():
-		print(f"Error: Input file not found: {input_path}", file=sys.stderr)
 		sys.exit(1)
 
 	if args.output:
@@ -496,19 +657,76 @@ def main() -> None:
 	else:
 		checkpoint_dir = Path.cwd() / "output" / "chunks" / "checkpoints" / input_path.stem
 
+	if args.resume:
+		checkpoint_path = find_latest_checkpoint(checkpoint_dir, input_path.stem)
+		checkpoint = load_checkpoint(checkpoint_path)
+		settings = checkpoint.get("settings") if isinstance(checkpoint.get("settings"), dict) else {}
+
+		next_article_index = int(checkpoint.get("next_article_index", 0))
+		seed_chunks = checkpoint.get("chunks") if isinstance(checkpoint.get("chunks"), list) else []
+
+		if args.output:
+			output_path = args.output.resolve()
+		else:
+			checkpoint_output_raw = str(checkpoint.get("output_path", "") or "").strip()
+			if checkpoint_output_raw:
+				output_path = Path(checkpoint_output_raw).resolve()
+			else:
+				output_path = Path.cwd() / "output" / "chunks" / f"{input_path.stem}_semantic_chunks.json"
+
+		model = _pick_setting(settings, "model", args.model) or DEFAULT_MODEL
+		text_field = _pick_setting(settings, "text_field", args.field) or "content"
+		target_chars = int(_pick_setting(settings, "target_chars", args.target_chars) or 900)
+		max_chars = int(_pick_setting(settings, "max_chars", args.max_chars) or 1400)
+		similarity_threshold = float(_pick_setting(settings, "similarity_threshold", args.similarity_threshold) or 0.72)
+		max_retries = int(_pick_setting(settings, "max_retries", args.max_retries) or 5)
+		pause_seconds = float(_pick_setting(settings, "pause_seconds", args.pause) or 0.15)
+		checkpoint_every = int(_pick_setting(settings, "checkpoint_every", args.checkpoint_every) or DEFAULT_CHECKPOINT_EVERY)
+
+		print(f"Using checkpoint: {checkpoint_path}")
+		print(f"Resuming from article index: {next_article_index + 1}")
+		print(f"Loaded partial chunks: {len(seed_chunks)}")
+
+		semantic_chunk_articles(
+			input_path=input_path,
+			output_path=output_path,
+			api_key=api_key,
+			model=model,
+			text_field=text_field,
+			target_chars=max(200, target_chars),
+			max_chars=max(300, max_chars),
+			similarity_threshold=max(0.0, min(1.0, similarity_threshold)),
+			max_retries=max(0, max_retries),
+			pause_seconds=max(0.0, pause_seconds),
+			checkpoint_dir=checkpoint_dir,
+			checkpoint_every=max(0, checkpoint_every),
+			start_article_index=max(0, next_article_index),
+			seed_chunks=seed_chunks,
+		)
+		return
+
+	model = args.model or DEFAULT_MODEL
+	text_field = args.field or "content"
+	target_chars = args.target_chars if args.target_chars is not None else 900
+	max_chars = args.max_chars if args.max_chars is not None else 1400
+	similarity_threshold = args.similarity_threshold if args.similarity_threshold is not None else 0.72
+	max_retries = args.max_retries if args.max_retries is not None else 5
+	pause_seconds = args.pause if args.pause is not None else 0.15
+	checkpoint_every = args.checkpoint_every if args.checkpoint_every is not None else DEFAULT_CHECKPOINT_EVERY
+
 	semantic_chunk_articles(
 		input_path=input_path,
 		output_path=output_path,
 		api_key=api_key,
-		model=args.model,
-		text_field=args.field,
-		target_chars=max(200, args.target_chars),
-		max_chars=max(300, args.max_chars),
-		similarity_threshold=max(0.0, min(1.0, args.similarity_threshold)),
-		max_retries=max(0, args.max_retries),
-		pause_seconds=max(0.0, args.pause),
+		model=model,
+		text_field=text_field,
+		target_chars=max(200, target_chars),
+		max_chars=max(300, max_chars),
+		similarity_threshold=max(0.0, min(1.0, similarity_threshold)),
+		max_retries=max(0, max_retries),
+		pause_seconds=max(0.0, pause_seconds),
 		checkpoint_dir=checkpoint_dir,
-		checkpoint_every=max(0, args.checkpoint_every),
+		checkpoint_every=max(0, checkpoint_every),
 	)
 
 

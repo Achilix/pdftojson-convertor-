@@ -105,11 +105,14 @@ python src/semantic_chunk.py output/extracted/codedecommerce_articles.json -o ou
 # Tune chunking behavior
 python src/semantic_chunk.py output/extracted/codedecommerce_articles.json --target-chars 800 --max-chars 1300 --similarity-threshold 0.70
 
-# Enable checkpoints every 5 articles
-python src/semantic_chunk.py output/extracted/codedecommerce_articles.json --checkpoint-every 5
+# Enable checkpoints every 50 articles
+python src/semantic_chunk.py output/extracted/codedecommerce_articles.json --checkpoint-every 50
 
 # Resume from latest checkpoint
-python src/resume_semantic_chunk.py output/extracted/codedecommerce_articles.json
+python src/semantic_chunk.py output/extracted/codedecommerce_articles.json --resume
+
+# Clean an existing semantic chunks file
+python src/semantic_chunk.py output/chunks/codedecommerce_articles_semantic_chunks.json --clean
 ```
 
 By default it writes:

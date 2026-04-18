@@ -587,8 +587,8 @@ def main() -> None:
 	parser.add_argument(
 		"--max-pages",
 		type=int,
-		default=50,
-		help="When input is a PDF, extract only first N pages before chunking (default: 50)",
+		default=0,
+		help="When input is a PDF, extract only first N pages before chunking (default: 0 = all pages)",
 	)
 	parser.add_argument(
 		"--extract-output-dir",

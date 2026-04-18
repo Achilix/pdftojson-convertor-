@@ -2,8 +2,9 @@ import argparse
 import json
 import re
 import statistics
+from collections import Counter
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import List, Dict, Set, Tuple
 
 import pandas as pd
 
@@ -29,12 +30,27 @@ INLINE_FOOTNOTE_SPLIT_RE = re.compile(
 INLINE_PAREN_FOOTNOTE_SPLIT_RE = re.compile(
 	r"(?i)\s+\(\d{1,2}\)\s*(?:l['’]emploi|le\s+ministre\s+d['’]etat|sont\s+abrog[ée]es|dans\s+les\s+cas\s+o[uù]|modifi[ée]|ajout[ée]|article\s+\d+\s*[—-])"
 )
+INLINE_EDITORIAL_NOTE_SPLIT_RE = re.compile(
+	r"(?i)\s+\d+\s+(?:publi[ée]\s+au\s+bulletin\s+officiel|les\s+dispositions\s+de\s+l[’']article|ledit\s+dahir)\b"
+)
+INLINE_ARTICLE_AMENDMENT_NOTE_SPLIT_RE = re.compile(
+	r"(?i)\s+\d+\s+L.{0,2}article\s+\d+\s*(?:bis|ter|quater|quinquies|sexies|septies|octies|nonies|decies)?\b"
+)
+INLINE_PAGE_TRANSITION_SPLIT_RE = re.compile(
+	r"(?i)\b\d{2,4}\s+(?:circulaire|dahir|d[ée]cret|arr[êe]t[ée]|annexe|mod[èe]le(?:-type)?)\b"
+)
+CROSS_DOC_TRANSITION_SPLIT_RE = re.compile(
+	r"(?i)\b(?:2\.?\s*cadre\s+relatif\s+aux\s+etablissements\s+de\s+credit|louange\s+a\s+dieu\s+seul|a\s+d[ée]cid[ée]\s+ce\s+qui\s+suit)\b"
+)
 HEADER_FOOTER_LINE_PATTERNS = (
 	re.compile(r"(?i)^\s*public\s*$"),
 	re.compile(r"(?i)^\s*recueil\s+des\s+textes\s+l[ée]gislatifs\b.*$"),
 	re.compile(r"(?i)^\s*mis\s+[àa]\s+jour\b.*$"),
 	re.compile(r"(?i)^\s*\d+\s*\.\s*statut\s+de\s+bank\s+al[\s-]?maghrib\b.*$"),
 	re.compile(r"(?i)^\s*publi[ée]\s+au\s+bulletin\s+officiel\b.*$"),
+)
+HEADER_FOOTER_KEYWORD_RE = re.compile(
+	r"(?i)\b(?:recueil\s+des\s+textes|bulletin\s+officiel|bank\s+al[\s-]?maghrib|public|mis\s+[àa]\s+jour)\b"
 )
 SKIP_ARTICLE_PREV_LINE_RE = re.compile(
 	r"(?im)(?:\bVoir\s+articles?\b|pr[ée]cit[ée]e?\.\s*$)"
@@ -76,6 +92,7 @@ def _extract_page_structure(
 
 	for page_num, page in page_iterable:
 		page_dict = page.get_text("dict")
+		page_height = float(page.rect.height)
 		page_lines: List[Dict[str, object]] = []
 
 		for block in page_dict.get("blocks", []):
@@ -88,6 +105,10 @@ def _extract_page_structure(
 				if not text:
 					continue
 
+				line_bbox = line.get("bbox", [0.0, 0.0, 0.0, 0.0])
+				y0 = float(line_bbox[1]) if len(line_bbox) > 1 else 0.0
+				y1 = float(line_bbox[3]) if len(line_bbox) > 3 else y0
+
 				span_sizes = [float(span.get("size", 0.0)) for span in spans if span.get("text")]
 				line_size = max(span_sizes) if span_sizes else 0.0
 				if line_size:
@@ -98,12 +119,15 @@ def _extract_page_structure(
 						"text": text,
 						"spans": spans,
 						"size": line_size,
+						"y0": y0,
+						"y1": y1,
 					}
 				)
 
-		pages_data.append({"page_num": page_num, "lines": page_lines})
+		pages_data.append({"page_num": page_num, "lines": page_lines, "page_height": page_height})
 
 	body_size = statistics.median(line_sizes) if line_sizes else 12.0
+	recurring_margin_signatures = _detect_recurring_margin_signatures(pages_data)
 	section_size_threshold = body_size * 1.12
 	titre_size_threshold = body_size * 1.22
 	livre_size_threshold = body_size * 1.35
@@ -115,7 +139,21 @@ def _extract_page_structure(
 
 	for page_data in pages_data:
 		page_num = int(page_data["page_num"])
-		lines = page_data["lines"]  # type: ignore[assignment]
+		page_height = float(page_data.get("page_height", 0.0) or 0.0)
+		all_lines = page_data["lines"]  # type: ignore[assignment]
+		lines = [
+			line
+			for line in all_lines
+			if not _is_margin_header_footer_line(
+				text=str(line.get("text", "")),
+				line_size=float(line.get("size", 0.0) or 0.0),
+				y0=float(line.get("y0", 0.0) or 0.0),
+				y1=float(line.get("y1", 0.0) or 0.0),
+				page_height=page_height,
+				body_size=body_size,
+				recurring_signatures=recurring_margin_signatures,
+			)
+		]
 		page_text_parts: List[str] = []
 		page_start = cursor
 		line_cursor = cursor
@@ -208,6 +246,92 @@ def _extract_page_structure(
 	return raw_text, page_ranges, hierarchy_events
 
 
+def _margin_signature(text: str) -> str:
+	"""Normalize noisy line text to compare repeating headers/footers across pages."""
+	normalized = _normalize_heading(text).lower()
+	normalized = re.sub(r"\d+", "#", normalized)
+	normalized = re.sub(r"[\s\-–—_]+", " ", normalized)
+	normalized = re.sub(r"[^a-zà-öø-ÿ# ]+", "", normalized)
+	return normalized.strip()
+
+
+def _detect_recurring_margin_signatures(pages_data: List[Dict[str, object]]) -> Set[Tuple[str, str]]:
+	"""Find repeated top/bottom line signatures likely to be running headers/footers."""
+	counts: Counter[Tuple[str, str]] = Counter()
+
+	for page_data in pages_data:
+		page_height = float(page_data.get("page_height", 0.0) or 0.0)
+		if page_height <= 0:
+			continue
+
+		for line in page_data.get("lines", []):
+			text = str(line.get("text", "")).strip()
+			if not text:
+				continue
+
+			y0 = float(line.get("y0", 0.0) or 0.0)
+			y1 = float(line.get("y1", 0.0) or 0.0)
+			zone = ""
+			if y0 <= page_height * 0.14:
+				zone = "top"
+			elif y1 >= page_height * 0.88:
+				zone = "bottom"
+
+			if not zone:
+				continue
+
+			signature = _margin_signature(text)
+			if len(signature) < 6:
+				continue
+
+			counts[(zone, signature)] += 1
+
+	return {key for key, value in counts.items() if value >= 2}
+
+
+def _is_margin_header_footer_line(
+	text: str,
+	line_size: float,
+	y0: float,
+	y1: float,
+	page_height: float,
+	body_size: float,
+	recurring_signatures: Set[Tuple[str, str]],
+) -> bool:
+	"""Detect header/footer lines using style + recurrence, not only literal text matching."""
+	normalized = _normalize_heading(text)
+	if not normalized:
+		return True
+
+	if _is_probable_header_footer_line(normalized):
+		return True
+
+	if page_height <= 0:
+		return False
+
+	zone = ""
+	if y0 <= page_height * 0.14:
+		zone = "top"
+	elif y1 >= page_height * 0.88:
+		zone = "bottom"
+
+	if not zone:
+		return False
+
+	signature = _margin_signature(normalized)
+	if signature and (zone, signature) in recurring_signatures:
+		return True
+
+	if PAGE_NUMBER_LINE_RE.match(normalized):
+		return True
+
+	if line_size > 0 and line_size <= (body_size * 0.9):
+		if HEADER_FOOTER_KEYWORD_RE.search(normalized):
+			return True
+
+	return False
+
+
 def _position_to_page(position: int, page_ranges: List[Tuple[int, int, int]]) -> int:
 	"""Map a character offset in the merged text to a page number."""
 	if not page_ranges:
@@ -234,7 +358,8 @@ def _format_page_span(start_page: int, end_page: int) -> str:
 
 def _normalize_heading(value: str) -> str:
 	"""Normalize heading whitespace into a single readable line."""
-	cleaned = re.sub(r"\s+", " ", value.strip())
+	cleaned = value.replace("\u0007", " ")
+	cleaned = re.sub(r"\s+", " ", cleaned.strip())
 	# OCR often glues superscript references to the last word (e.g., "CHÉQUE65").
 	cleaned = re.sub(r"(?i)([A-Za-zÀ-ÖØ-öø-ÿ])(\d{2,3})$", r"\1.\2", cleaned)
 	return cleaned
@@ -266,7 +391,91 @@ def _normalize_article_number(raw_number: str, previous_base: int | None) -> Tup
 		if suffix.isdigit() and len(suffix) <= 3:
 			return f"{expected_str}.{suffix}", expected_base
 
+	fallback = _recover_compact_article_number(raw_number, previous_base)
+	if fallback is not None:
+		return fallback
+
 	return raw_number, current_base
+
+
+def _recover_compact_article_number(raw_number: str, previous_base: int | None) -> Tuple[str, int] | None:
+	"""Recover merged values like 53321 -> 53.321 or 12201 -> 122.01.
+
+	This handles OCR cases where the article number and a note/reference number
+	are concatenated into a single digit sequence.
+	"""
+	if not raw_number.isdigit() or len(raw_number) < 4:
+		return None
+
+	candidates: List[Tuple[int, int, str]] = []  # (score, base_value, suffix)
+	for suffix_len in (3, 2):
+		if len(raw_number) <= suffix_len:
+			continue
+
+		base_part = raw_number[:-suffix_len]
+		suffix = raw_number[-suffix_len:]
+		if not base_part.isdigit() or not suffix.isdigit():
+			continue
+
+		base_value = int(base_part)
+		if not (1 <= base_value <= 2000):
+			continue
+
+		score = 0
+		if previous_base is not None:
+			delta = abs(base_value - previous_base)
+			if base_value in (previous_base - 1, previous_base, previous_base + 1):
+				score += 4
+			elif delta <= 3:
+				score += 3
+			elif delta <= 8:
+				score += 1
+		else:
+			if len(raw_number) >= 5 and base_value <= 300:
+				score += 1
+
+		if suffix_len == 3:
+			score += 1
+
+		candidates.append((score, base_value, suffix))
+
+	if not candidates:
+		return None
+
+	best_score, best_base, best_suffix = max(candidates, key=lambda item: item[0])
+	if previous_base is not None and best_score < 2:
+		return None
+
+	return f"{best_base}.{best_suffix}", best_base
+
+
+def _normalize_compound_article_number(article_number: str) -> str:
+	"""Drop OCR tail suffixes from compound article numbers.
+
+	Examples:
+	- "2ter.21" -> "2ter"
+	- "574-2.184" -> "574-2"
+
+	Keeps plain numeric decimal forms unchanged (e.g., "10.12").
+	"""
+	normalized = article_number.strip()
+	if not normalized:
+		return normalized
+
+	qualifier_pattern = r"(?:bis|ter|quater|quinquies|sexies|septies|octies|nonies|decies)"
+
+	qualified_match = re.match(
+		rf"(?i)^(\d+\s*{qualifier_pattern})\.(\d{{1,3}})$",
+		normalized,
+	)
+	if qualified_match:
+		return re.sub(r"\s+", "", qualified_match.group(1))
+
+	compound_dash_match = re.match(r"^(\d+(?:-\d+)+)\.(\d{1,3})$", normalized)
+	if compound_dash_match:
+		return compound_dash_match.group(1)
+
+	return normalized
 
 
 def _extract_subarticle_suffix(raw_article_body: str) -> str | None:
@@ -522,6 +731,22 @@ def _strip_footnotes_from_content(content: str) -> str:
 	paren_match = INLINE_PAREN_FOOTNOTE_SPLIT_RE.search(cleaned)
 	if paren_match and (cut_pos is None or paren_match.start() < cut_pos):
 		cut_pos = paren_match.start()
+
+	editorial_match = INLINE_EDITORIAL_NOTE_SPLIT_RE.search(cleaned)
+	if editorial_match and (cut_pos is None or editorial_match.start() < cut_pos):
+		cut_pos = editorial_match.start()
+
+	amendment_match = INLINE_ARTICLE_AMENDMENT_NOTE_SPLIT_RE.search(cleaned)
+	if amendment_match and (cut_pos is None or amendment_match.start() < cut_pos):
+		cut_pos = amendment_match.start()
+
+	transition_inline_match = INLINE_PAGE_TRANSITION_SPLIT_RE.search(cleaned)
+	if transition_inline_match and (cut_pos is None or transition_inline_match.start() < cut_pos):
+		cut_pos = transition_inline_match.start()
+
+	transition_match = CROSS_DOC_TRANSITION_SPLIT_RE.search(cleaned)
+	if transition_match and (cut_pos is None or transition_match.start() < cut_pos):
+		cut_pos = transition_match.start()
 
 	if cut_pos is not None:
 		cleaned = cleaned[:cut_pos]
@@ -853,10 +1078,14 @@ def _extract_articles(
 		):
 			article_number = f"{article_number} {annotation_label}"
 
+		article_number = _normalize_compound_article_number(article_number)
+
 		# Flatten whitespace so content is easier to read in JSON/CSV and Excel.
 		content = re.sub(r"\r?\n+", " ", content)
 		content = re.sub(r"[ \t]+", " ", content)
 		content = content.strip()
+		if not content:
+			continue
 
 		articles.append(
 			{

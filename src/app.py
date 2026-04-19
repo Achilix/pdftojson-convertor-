@@ -52,6 +52,15 @@ HEADER_FOOTER_LINE_PATTERNS = (
 HEADER_FOOTER_KEYWORD_RE = re.compile(
 	r"(?i)\b(?:recueil\s+des\s+textes|bulletin\s+officiel|bank\s+al[\s-]?maghrib|public|mis\s+[àa]\s+jour)\b"
 )
+STRUCTURAL_HEADING_RE = re.compile(
+	r"(?i)^\s*(?:"
+	r"livre\s+(?:premier|[ivxlcdm]+|\d+)"
+	r"|titre\s+(?:premier|[ivxlcdm]+|\d+)"
+	r"|(?:chapitre|hapitre)\s+(?:premier|[ivxlcdm]+(?:\d{1,2})?|\d+)"
+	r"|section\b"
+	r"|sous(?:\s*[-–—‑]\s*|\s+)section\b"
+	r")"
+)
 SKIP_ARTICLE_PREV_LINE_RE = re.compile(
 	r"(?im)(?:\bVoir\s+articles?\b|pr[ée]cit[ée]e?\.\s*$)"
 )
@@ -166,7 +175,7 @@ def _extract_page_structure(
 			line_size = float(line.get("size", 0.0))
 			page_text_parts.append(text)
 			added_sous_at_line_start = False
-			consumed_next_heading_line = False
+			consumed_heading_lines = 0
 
 			next_text = ""
 			if idx + 1 < len(lines):
@@ -174,24 +183,42 @@ def _extract_page_structure(
 
 			if _is_livre_heading(text, spans, line_size, body_size, livre_size_threshold):
 				heading_value = _normalize_hierarchy_heading("livre", text)
-				continuation = _extract_heading_continuation(next_text, "livre")
-				if continuation is not None:
+				look_ahead_idx = idx + 1
+				while look_ahead_idx < len(lines):
+					continuation = _extract_heading_continuation(str(lines[look_ahead_idx]["text"]), "livre")
+					if continuation is None:
+						break
 					heading_value = _normalize_hierarchy_heading("livre", f"{heading_value} {continuation}")
-					consumed_next_heading_line = True
+					consumed_heading_lines += 1
+					look_ahead_idx += 1
+					if consumed_heading_lines >= 3:
+						break
 				hierarchy_events.append((line_cursor, "livre", heading_value))
 			elif _is_titre_heading(text, spans, line_size, body_size, titre_size_threshold):
 				heading_value = _normalize_hierarchy_heading("titre", text)
-				continuation = _extract_heading_continuation(next_text, "titre")
-				if continuation is not None:
+				look_ahead_idx = idx + 1
+				while look_ahead_idx < len(lines):
+					continuation = _extract_heading_continuation(str(lines[look_ahead_idx]["text"]), "titre")
+					if continuation is None:
+						break
 					heading_value = _normalize_hierarchy_heading("titre", f"{heading_value} {continuation}")
-					consumed_next_heading_line = True
+					consumed_heading_lines += 1
+					look_ahead_idx += 1
+					if consumed_heading_lines >= 3:
+						break
 				hierarchy_events.append((line_cursor, "titre", heading_value))
 			elif _is_chapitre_heading(text, spans, line_size, body_size, section_size_threshold):
 				heading_value = _normalize_hierarchy_heading("chapitre", text)
-				continuation = _extract_heading_continuation(next_text, "chapitre")
-				if continuation is not None:
+				look_ahead_idx = idx + 1
+				while look_ahead_idx < len(lines):
+					continuation = _extract_heading_continuation(str(lines[look_ahead_idx]["text"]), "chapitre")
+					if continuation is None:
+						break
 					heading_value = _normalize_hierarchy_heading("chapitre", f"{heading_value} {continuation}")
-					consumed_next_heading_line = True
+					consumed_heading_lines += 1
+					look_ahead_idx += 1
+					if consumed_heading_lines >= 3:
+						break
 				hierarchy_events.append((line_cursor, "chapitre", heading_value))
 			elif _is_sous_section_heading(
 				text,
@@ -212,10 +239,16 @@ def _extract_page_structure(
 				allow_unlabeled_sous_section=allow_unlabeled_sous_section,
 			):
 				heading_value = _normalize_hierarchy_heading("section", text)
-				continuation = _extract_heading_continuation(next_text, "section")
-				if continuation is not None:
+				look_ahead_idx = idx + 1
+				while look_ahead_idx < len(lines):
+					continuation = _extract_heading_continuation(str(lines[look_ahead_idx]["text"]), "section")
+					if continuation is None:
+						break
 					heading_value = _normalize_hierarchy_heading("section", f"{heading_value} {continuation}")
-					consumed_next_heading_line = True
+					consumed_heading_lines += 1
+					look_ahead_idx += 1
+					if consumed_heading_lines >= 3:
+						break
 				hierarchy_events.append((line_cursor, "section", heading_value))
 
 			sous_section_inline = _extract_sous_section_from_line(text)
@@ -226,11 +259,12 @@ def _extract_page_structure(
 
 			line_cursor += len(text) + 1
 
-			if consumed_next_heading_line and idx + 1 < len(lines):
-				second_line_text = str(lines[idx + 1]["text"])
-				page_text_parts.append(second_line_text)
-				line_cursor += len(second_line_text) + 1
-				idx += 2
+			if consumed_heading_lines > 0 and idx + consumed_heading_lines < len(lines):
+				for offset in range(1, consumed_heading_lines + 1):
+					continuation_text = str(lines[idx + offset]["text"])
+					page_text_parts.append(continuation_text)
+					line_cursor += len(continuation_text) + 1
+				idx += consumed_heading_lines + 1
 				continue
 
 			idx += 1
@@ -317,6 +351,11 @@ def _is_margin_header_footer_line(
 
 	if not zone:
 		return False
+
+	# Preserve true structural headings near margins even if they repeat.
+	if STRUCTURAL_HEADING_RE.match(normalized) is not None:
+		if line_size <= 0.0 or line_size >= (body_size * 1.0):
+			return False
 
 	signature = _margin_signature(normalized)
 	if signature and (zone, signature) in recurring_signatures:
@@ -609,13 +648,50 @@ def _extract_heading_continuation(next_text: str, level: str) -> str | None:
 	if re.match(r"(?i)^(de(?:\s+l['’]?)?|des|du|d['’])\b", normalized) is None:
 		if level not in {"livre", "titre", "chapitre", "section"}:
 			return None
-		if not _is_uppercase_heading_fragment(normalized):
+		if not _is_uppercase_heading_fragment(normalized) and not _is_probable_short_heading_continuation(
+			normalized,
+			level,
+		):
 			return None
 
 	if len(normalized) > 160:
 		return None
 
 	return normalized
+
+
+def _is_probable_short_heading_continuation(text: str, level: str) -> bool:
+	"""Heuristic for short wrapped heading fragments like "métalliques" or "Politique monétaire"."""
+	normalized = _normalize_heading(text)
+	if not normalized:
+		return False
+
+	if len(normalized) > 70:
+		return False
+
+	if re.search(r"[\.;,:!?]", normalized):
+		return False
+
+	if re.match(r"(?i)^\s*(?:article|livre|titre|chapitre|section|sous(?:\s|-)?section)\b", normalized):
+		return False
+
+	if re.match(r"(?i)^\s*(?:la|le|les|l['’]|un|une|au|aux)\b", normalized):
+		return False
+
+	words = re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'’\-]*", normalized)
+	if not words:
+		return False
+
+	if len(words) > 8:
+		return False
+
+	if len(words) == 1:
+		return True
+
+	if level == "chapitre":
+		return words[0][0].isupper()
+
+	return words[0][0].isupper()
 
 
 def _normalize_hierarchy_heading(level: str, heading_value: str) -> str:

@@ -63,28 +63,44 @@ def _is_retryable_error(exc: Exception) -> bool:
 	return any(hint in message for hint in RETRYABLE_HINTS)
 
 
-def _embed_text_with_retry(
+def _normalize_model_name(model: str) -> str:
+	return f"models/{model}" if not model.startswith("models/") else model
+
+
+def _extract_embedding_values(embedding: Any) -> List[float]:
+	if hasattr(embedding, "values"):
+		return list(embedding.values)
+	if isinstance(embedding, (list, tuple)):
+		return list(embedding)
+	raise RuntimeError(f"Unexpected embedding type: {type(embedding)}")
+
+
+def _embed_texts_with_retry(
 	client: Any,
-	text: str,
+	texts: List[str],
 	model: str,
 	max_retries: int,
-) -> List[float]:
+) -> List[List[float]]:
+	if not texts:
+		return []
+
 	attempt = 0
+	model_name = _normalize_model_name(model)
 	while True:
 		try:
 			response = client.models.embed_content(
-				model=f"models/{model}" if not model.startswith("models/") else model,
-				contents=text,
+				model=model_name,
+				contents=texts,
 			)
 			if not response.embeddings:
 				raise RuntimeError("No embedding returned")
 
-			embedding = response.embeddings[0]
-			if hasattr(embedding, "values"):
-				return list(embedding.values)
-			if isinstance(embedding, (list, tuple)):
-				return list(embedding)
-			raise RuntimeError(f"Unexpected embedding type: {type(embedding)}")
+			if len(response.embeddings) != len(texts):
+				raise RuntimeError(
+					f"Embedding count mismatch: expected {len(texts)}, got {len(response.embeddings)}"
+				)
+
+			return [_extract_embedding_values(embedding) for embedding in response.embeddings]
 		except Exception as exc:
 			attempt += 1
 			if attempt > max_retries or not _is_retryable_error(exc):
@@ -92,6 +108,20 @@ def _embed_text_with_retry(
 			base_delay = min(30.0, 2 ** (attempt - 1))
 			jitter = random.uniform(0.0, 0.35)
 			time.sleep(base_delay + jitter)
+
+
+def _embed_text_with_retry(
+	client: Any,
+	text: str,
+	model: str,
+	max_retries: int,
+) -> List[float]:
+	return _embed_texts_with_retry(
+		client=client,
+		texts=[text],
+		model=model,
+		max_retries=max_retries,
+	)[0]
 
 
 def _cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
@@ -252,6 +282,7 @@ def _chunk_article_semantically(
 	similarity_threshold: float,
 	max_retries: int,
 	pause_seconds: float,
+	embed_batch_size: int,
 ) -> List[Dict[str, Any]]:
 	content = str(article.get(text_field, "") or "").strip()
 	if not content:
@@ -262,11 +293,13 @@ def _chunk_article_semantically(
 		return []
 
 	sentence_embeddings: List[List[float]] = []
-	for sentence in sentences:
-		sentence_embeddings.append(
-			_embed_text_with_retry(
+	effective_batch_size = max(1, embed_batch_size)
+	for start in range(0, len(sentences), effective_batch_size):
+		batch_sentences = sentences[start:start + effective_batch_size]
+		sentence_embeddings.extend(
+			_embed_texts_with_retry(
 				client=client,
-				text=sentence,
+				texts=batch_sentences,
 				model=model,
 				max_retries=max_retries,
 			)
@@ -425,6 +458,7 @@ def semantic_chunk_articles(
 	similarity_threshold: float,
 	max_retries: int,
 	pause_seconds: float,
+	embed_batch_size: int = 16,
 	checkpoint_dir: Optional[Path] = None,
 	checkpoint_every: int = DEFAULT_CHECKPOINT_EVERY,
 	start_article_index: int = 0,
@@ -448,6 +482,7 @@ def semantic_chunk_articles(
 		"similarity_threshold": similarity_threshold,
 		"max_retries": max_retries,
 		"pause_seconds": pause_seconds,
+		"embed_batch_size": embed_batch_size,
 		"checkpoint_every": checkpoint_every,
 	}
 
@@ -472,6 +507,7 @@ def semantic_chunk_articles(
 				similarity_threshold=similarity_threshold,
 				max_retries=max_retries,
 				pause_seconds=pause_seconds,
+				embed_batch_size=embed_batch_size,
 			)
 			all_chunks.extend(article_chunks)
 		except Exception as exc:
@@ -571,6 +607,12 @@ def main() -> None:
 		type=float,
 		default=None,
 		help="Pause in seconds between API calls (default: 0.15)",
+	)
+	parser.add_argument(
+		"--embed-batch-size",
+		type=int,
+		default=None,
+		help="Number of sentences per embedding request (default: 16)",
 	)
 	parser.add_argument(
 		"--checkpoint-dir",
@@ -681,6 +723,7 @@ def main() -> None:
 		similarity_threshold = float(_pick_setting(settings, "similarity_threshold", args.similarity_threshold) or 0.72)
 		max_retries = int(_pick_setting(settings, "max_retries", args.max_retries) or 5)
 		pause_seconds = float(_pick_setting(settings, "pause_seconds", args.pause) or 0.15)
+		embed_batch_size = int(_pick_setting(settings, "embed_batch_size", args.embed_batch_size) or 16)
 		checkpoint_every = int(_pick_setting(settings, "checkpoint_every", args.checkpoint_every) or DEFAULT_CHECKPOINT_EVERY)
 
 		print(f"Using checkpoint: {checkpoint_path}")
@@ -698,6 +741,7 @@ def main() -> None:
 			similarity_threshold=max(0.0, min(1.0, similarity_threshold)),
 			max_retries=max(0, max_retries),
 			pause_seconds=max(0.0, pause_seconds),
+			embed_batch_size=max(1, embed_batch_size),
 			checkpoint_dir=checkpoint_dir,
 			checkpoint_every=max(0, checkpoint_every),
 			start_article_index=max(0, next_article_index),
@@ -712,6 +756,7 @@ def main() -> None:
 	similarity_threshold = args.similarity_threshold if args.similarity_threshold is not None else 0.72
 	max_retries = args.max_retries if args.max_retries is not None else 5
 	pause_seconds = args.pause if args.pause is not None else 0.15
+	embed_batch_size = args.embed_batch_size if args.embed_batch_size is not None else 16
 	checkpoint_every = args.checkpoint_every if args.checkpoint_every is not None else DEFAULT_CHECKPOINT_EVERY
 
 	semantic_chunk_articles(
@@ -725,6 +770,7 @@ def main() -> None:
 		similarity_threshold=max(0.0, min(1.0, similarity_threshold)),
 		max_retries=max(0, max_retries),
 		pause_seconds=max(0.0, pause_seconds),
+		embed_batch_size=max(1, embed_batch_size),
 		checkpoint_dir=checkpoint_dir,
 		checkpoint_every=max(0, checkpoint_every),
 	)

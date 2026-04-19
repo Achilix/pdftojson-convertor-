@@ -179,6 +179,18 @@ Embed all records in a JSON file:
 python src/embed.py output/extracted/codedecommerce_articles.json
 ```
 
+Enable periodic checkpoints (every N processed records):
+
+```bash
+python src/embed.py output/extracted/codedecommerce_articles.json --checkpoint-every 50
+```
+
+By default, checkpoint snapshots are written to:
+
+- `output/embeddings/checkpoints/<input_stem>/`
+
+You can override this with `--checkpoint-dir`.
+
 Default output (if `-o` not set):
 
 - `output/embeddings/<input_stem>_embedded.json`
@@ -188,6 +200,11 @@ Fill only missing embeddings:
 ```bash
 python src/embed_missing.py output/embeddings/codedecommerce_articles_embedded.json
 ```
+
+`embed_missing.py` also writes periodic checkpoint snapshots (default every 25 missing records):
+
+- Default checkpoint path: `<output_parent>/checkpoints/<input_stem>/`
+- Override with `--checkpoint-dir`
 
 `embed_missing.py` overwrites input by default when `-o` is not provided.
 

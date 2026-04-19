@@ -5,9 +5,9 @@ import random
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
-from embed import DEFAULT_MODEL, embed_text
+from embed import DEFAULT_MODEL, embed_text, embed_texts
 
 
 RETRYABLE_HINTS = (
@@ -72,6 +72,49 @@ def _write_articles(output_path: Path, articles: List[Dict[str, Any]]) -> None:
 	tmp_path.replace(output_path)
 
 
+def _write_json_atomic(path: Path, payload: Any) -> None:
+	path.parent.mkdir(parents=True, exist_ok=True)
+	tmp_path = path.with_suffix(path.suffix + ".tmp")
+	with tmp_path.open("w", encoding="utf-8") as handle:
+		json.dump(payload, handle, ensure_ascii=False, indent=2)
+	tmp_path.replace(path)
+
+
+def _resolve_checkpoint_dir(
+	input_path: Path,
+	output_path: Path,
+	checkpoint_dir: Path | None,
+) -> Path:
+	if checkpoint_dir is not None:
+		return checkpoint_dir
+	return output_path.parent / "checkpoints" / input_path.stem
+
+
+def _write_missing_checkpoint(
+	checkpoint_dir: Path,
+	input_path: Path,
+	output_path: Path,
+	processed_missing: int,
+	total_articles: int,
+	total_missing: int,
+	articles: List[Dict[str, Any]],
+	settings: Dict[str, Any],
+) -> Path:
+	checkpoint_payload = {
+		"input_path": str(input_path),
+		"output_path": str(output_path),
+		"processed_missing": processed_missing,
+		"total_missing": total_missing,
+		"total_articles": total_articles,
+		"articles": articles,
+		"settings": settings,
+		"created_at": time.time(),
+	}
+	checkpoint_path = checkpoint_dir / f"{input_path.stem}_embed_missing_checkpoint_{processed_missing:06d}.json"
+	_write_json_atomic(checkpoint_path, checkpoint_payload)
+	return checkpoint_path
+
+
 def _has_embedding(article: Dict[str, Any]) -> bool:
 	embedding = article.get("embedding")
 	if embedding is None:
@@ -119,6 +162,79 @@ def _embed_with_retry(text: str, api_key: str, model: str, max_retries: int) -> 
 			time.sleep(base_delay + jitter)
 
 
+def _embed_batch_with_retry(
+	texts: List[str],
+	api_key: str,
+	model: str,
+	max_retries: int,
+) -> List[List[float]]:
+	attempt = 0
+	while True:
+		try:
+			return embed_texts(
+				texts,
+				api_key=api_key,
+				model=model,
+				batch_size=max(1, len(texts)),
+			)
+		except Exception as exc:
+			attempt += 1
+			if attempt > max_retries or not _is_retryable_error(exc):
+				raise
+
+			base_delay = min(30.0, 2 ** (attempt - 1))
+			jitter = random.uniform(0.0, 0.35)
+			time.sleep(base_delay + jitter)
+
+
+def _process_pending_batch(
+	pending: List[Tuple[int, Dict[str, Any], str, str]],
+	missing: int,
+	api_key: str,
+	model: str,
+	max_retries: int,
+) -> int:
+	if not pending:
+		return 0
+
+	failures = 0
+	first = pending[0][0]
+	last = pending[-1][0]
+	batch_texts = [text for _, _, _, text in pending]
+	print(
+		f"[{first}-{last}/{missing}] Embedding batch ({len(pending)} article(s))...",
+		end=" ",
+		flush=True,
+	)
+
+	try:
+		embeddings = _embed_batch_with_retry(
+			texts=batch_texts,
+			api_key=api_key,
+			model=model,
+			max_retries=max_retries,
+		)
+		for (_, article, _, _), embedding in zip(pending, embeddings):
+			article["embedding"] = embedding
+		dims = len(embeddings[0]) if embeddings else 0
+		print(f"OK ({dims} dims each)")
+		return failures
+	except Exception as exc:
+		print(f"BATCH FAILED: {str(exc)[:180]}")
+
+	for processed_missing, article, label, text_to_embed in pending:
+		print(f"[{processed_missing}/{missing}] Embedding article {label}...", end=" ", flush=True)
+		try:
+			embedding = _embed_with_retry(text_to_embed, api_key, model, max_retries=max_retries)
+			article["embedding"] = embedding
+			print(f"OK ({len(embedding)} dims)")
+		except Exception as exc:
+			failures += 1
+			print(f"FAILED: {str(exc)[:180]}")
+
+	return failures
+
+
 def embed_missing_articles(
 	input_path: Path,
 	output_path: Path,
@@ -128,6 +244,8 @@ def embed_missing_articles(
 	max_retries: int,
 	checkpoint_every: int,
 	pause_seconds: float,
+	batch_size: int,
+	checkpoint_dir: Path | None,
 ) -> None:
 	articles = _load_articles(input_path)
 	total = len(articles)
@@ -145,6 +263,25 @@ def embed_missing_articles(
 
 	processed_missing = 0
 	failures = 0
+	effective_batch_size = max(1, batch_size)
+	pending: List[Tuple[int, Dict[str, Any], str, str]] = []
+	last_checkpoint_index = 0
+	effective_checkpoint_dir: Path | None = None
+	if checkpoint_every > 0:
+		effective_checkpoint_dir = _resolve_checkpoint_dir(
+			input_path=input_path,
+			output_path=output_path,
+			checkpoint_dir=checkpoint_dir,
+		)
+
+	settings = {
+		"model": model,
+		"text_field": text_field,
+		"batch_size": effective_batch_size,
+		"checkpoint_every": checkpoint_every,
+		"max_retries": max_retries,
+		"pause_seconds": pause_seconds,
+	}
 
 	for index, article in enumerate(articles, start=1):
 		if _has_embedding(article):
@@ -156,25 +293,76 @@ def embed_missing_articles(
 		if not text_to_embed:
 			print(f"[{processed_missing}/{missing}] Article {label}: SKIPPED (empty '{text_field}')")
 			failures += 1
-			continue
+		else:
+			pending.append((processed_missing, article, label, text_to_embed))
 
-		print(f"[{processed_missing}/{missing}] Embedding article {label}...", end=" ", flush=True)
-		try:
-			embedding = _embed_with_retry(text_to_embed, api_key, model, max_retries=max_retries)
-			article["embedding"] = embedding
-			print(f"OK ({len(embedding)} dims)")
-		except Exception as exc:
-			failures += 1
-			print(f"FAILED: {str(exc)[:180]}")
+		if len(pending) >= effective_batch_size:
+			failures += _process_pending_batch(
+				pending=pending,
+				missing=missing,
+				api_key=api_key,
+				model=model,
+				max_retries=max_retries,
+			)
+			pending = []
+			if pause_seconds > 0:
+				time.sleep(pause_seconds)
 
 		if checkpoint_every > 0 and processed_missing % checkpoint_every == 0:
+			if pending:
+				failures += _process_pending_batch(
+					pending=pending,
+					missing=missing,
+					api_key=api_key,
+					model=model,
+					max_retries=max_retries,
+				)
+				pending = []
+				if pause_seconds > 0:
+					time.sleep(pause_seconds)
+
 			_write_articles(output_path, articles)
 			print(f"Checkpoint saved: {output_path}")
+			if effective_checkpoint_dir is not None:
+				checkpoint_path = _write_missing_checkpoint(
+					checkpoint_dir=effective_checkpoint_dir,
+					input_path=input_path,
+					output_path=output_path,
+					processed_missing=processed_missing,
+					total_articles=total,
+					total_missing=missing,
+					articles=articles,
+					settings=settings,
+				)
+				last_checkpoint_index = processed_missing
+				print(f"Checkpoint snapshot: {checkpoint_path}")
 
+	if pending:
+		failures += _process_pending_batch(
+			pending=pending,
+			missing=missing,
+			api_key=api_key,
+			model=model,
+			max_retries=max_retries,
+		)
 		if pause_seconds > 0:
 			time.sleep(pause_seconds)
 
 	_write_articles(output_path, articles)
+
+	if checkpoint_every > 0 and effective_checkpoint_dir is not None and last_checkpoint_index != processed_missing:
+		checkpoint_path = _write_missing_checkpoint(
+			checkpoint_dir=effective_checkpoint_dir,
+			input_path=input_path,
+			output_path=output_path,
+			processed_missing=processed_missing,
+			total_articles=total,
+			total_missing=missing,
+			articles=articles,
+			settings=settings,
+		)
+		print(f"Final checkpoint snapshot: {checkpoint_path}")
+
 	successes = missing - failures
 	print("\nDone")
 	print(f"Embedded now: {successes}/{missing}")
@@ -219,16 +407,28 @@ def main() -> None:
 		help="Retries for transient API errors (default: 5)",
 	)
 	parser.add_argument(
+		"--checkpoint-dir",
+		type=Path,
+		default=None,
+		help="Directory to store checkpoint snapshots (default: <output_parent>/checkpoints/<input_stem>)",
+	)
+	parser.add_argument(
 		"--checkpoint-every",
 		type=int,
 		default=25,
 		help="Save output every N processed missing records (default: 25)",
 	)
 	parser.add_argument(
+		"--batch-size",
+		type=int,
+		default=16,
+		help="Number of texts per embedding request (default: 16)",
+	)
+	parser.add_argument(
 		"--pause",
 		type=float,
 		default=0.3,
-		help="Pause in seconds between embedding calls (default: 0.3)",
+		help="Pause in seconds between embedding requests/batches (default: 0.3)",
 	)
 
 	args = parser.parse_args()
@@ -254,6 +454,8 @@ def main() -> None:
 		max_retries=max(0, args.max_retries),
 		checkpoint_every=max(0, args.checkpoint_every),
 		pause_seconds=max(0.0, args.pause),
+		batch_size=max(1, args.batch_size),
+		checkpoint_dir=args.checkpoint_dir.resolve() if args.checkpoint_dir else None,
 	)
 
 

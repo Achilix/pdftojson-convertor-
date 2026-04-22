@@ -40,6 +40,54 @@ def _resolve_api_key(cli_api_key: str | None) -> str:
 	return os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY") or ""
 
 
+def _iter_embedded_files(embedded_source: Path) -> List[Path]:
+	if embedded_source.is_file():
+		return [embedded_source]
+
+	embedded_files = sorted(
+		path
+		for path in embedded_source.rglob("*_embedded.json")
+		if path.is_file()
+	)
+	if embedded_files:
+		return embedded_files
+
+	return sorted(path for path in embedded_source.rglob("*.json") if path.is_file())
+
+
+def _iter_embedded_articles(embedded_source: Path):
+	for embedded_file in _iter_embedded_files(embedded_source):
+		with embedded_file.open("r", encoding="utf-8") as handle:
+			loaded_articles = json.load(handle)
+
+		if not isinstance(loaded_articles, list):
+			continue
+
+		for article in loaded_articles:
+			if not isinstance(article, dict):
+				continue
+
+			article_copy = dict(article)
+			article_copy["_embedded_file"] = str(embedded_file)
+			yield article_copy
+
+
+def _normalize_article_embedding(article_embedding: Any) -> List[float]:
+	if isinstance(article_embedding, dict) and "values" in article_embedding:
+		article_embedding = article_embedding["values"]
+
+	if isinstance(article_embedding, (list, tuple)) and len(article_embedding) > 0:
+		first_elem = article_embedding[0]
+		if isinstance(first_elem, (list, tuple)) and len(first_elem) == 2:
+			if first_elem[0] == "values" and isinstance(first_elem[1], (list, tuple)):
+				article_embedding = first_elem[1]
+
+	if isinstance(article_embedding, (list, tuple)):
+		return list(article_embedding)
+
+	raise RuntimeError(f"Unexpected embedding type: {type(article_embedding)}")
+
+
 def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
 	"""
 	Calculate cosine similarity between two vectors.
@@ -126,11 +174,7 @@ def search_articles(
 	Returns:
 		List of tuples (article, similarity_score) sorted by score descending
 	"""
-	# Load embedded articles
-	with embedded_file.open("r", encoding="utf-8") as f:
-		articles = json.load(f)
-	
-	print(f"Loaded {len(articles)} embedded articles")
+	print(f"Searching embedded articles from {embedded_file}")
 	
 	# Embed the query
 	print(f"Embedding query: {query[:100]}...")
@@ -139,7 +183,9 @@ def search_articles(
 	
 	# Calculate similarities
 	results = []
-	for i, article in enumerate(articles, 1):
+	article_count = 0
+	for i, article in enumerate(_iter_embedded_articles(embedded_file), 1):
+		article_count += 1
 		if not isinstance(article, dict):
 			continue
 		
@@ -148,19 +194,9 @@ def search_articles(
 		if not article_embedding:
 			continue
 		
-		# Handle double-nested format: [[['values', [floats...]], [...]]]
-		# Extract the actual float array
-		if isinstance(article_embedding, (list, tuple)) and len(article_embedding) > 0:
-			# First level: article_embedding is [['values', [...]], [...]]
-			first_elem = article_embedding[0]
-			if isinstance(first_elem, (list, tuple)) and len(first_elem) == 2:
-				# Check if this is the ['values', [...]] format
-				if first_elem[0] == 'values' and isinstance(first_elem[1], (list, tuple)):
-					# Extract the float array
-					article_embedding = first_elem[1]
-		
 		# Calculate cosine similarity
 		try:
+			article_embedding = _normalize_article_embedding(article_embedding)
 			similarity = cosine_similarity(query_embedding, article_embedding)
 		except Exception as e:
 			continue
@@ -169,10 +205,11 @@ def search_articles(
 			results.append((article, similarity))
 		
 		if i % 100 == 0:
-			print(f"  Processed {i}/{len(articles)} articles...")
+			print(f"  Processed {i} articles...")
 	
 	# Sort by similarity descending
 	results.sort(key=lambda x: x[1], reverse=True)
+	print(f"Processed {article_count} embedded articles from {embedded_file}")
 	
 	return results[:top_k]
 
@@ -181,6 +218,7 @@ def format_result(article: Dict[str, Any], similarity: float, rank: int) -> str:
 	"""Format a search result for display."""
 	article_num = article.get("article_number") or article.get("article", "Unknown")
 	content = article.get("content", "")[:200]
+	embedded_file = article.get("_embedded_file", "")
 	
 	# Handle pages field - can be string like "158" or "158-159" or dict
 	pages = article.get("pages", "?")
@@ -193,12 +231,13 @@ def format_result(article: Dict[str, Any], similarity: float, rank: int) -> str:
 	
 	# Only show content line if there's actual content
 	content_line = f"Content: {content}...\n" if content else ""
+	embedded_file_line = f"Embedded file: {embedded_file}\n" if embedded_file else ""
 	
 	return f"""\
 #{rank} - Similarity: {similarity:.4f} ({similarity*100:.2f}%)
 Article: {article_num}
 Page(s): {pages_str}
-{content_line}"""
+{embedded_file_line}{content_line}"""
 
 
 def main():
@@ -208,7 +247,7 @@ def main():
 	parser.add_argument(
 		"embedded_file",
 		type=Path,
-		help="Path to JSON file with embedded articles (from embed.py)"
+		help="Path to a JSON file or directory with embedded articles (from embed.py)"
 	)
 	parser.add_argument(
 		"-q", "--query",

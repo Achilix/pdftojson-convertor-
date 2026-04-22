@@ -1,179 +1,163 @@
-# Legal PDF Processing and Semantic Search
+# Legal Semantic Search (Python API + Next.js Frontend)
 
-This project extracts legal articles from PDF files, enriches them, creates embeddings, and exposes both CLI and web search.
+This repository processes legal PDFs into structured records, generates embeddings, and provides semantic search through a Python API.
 
-## Project Structure
+The frontend now lives in [frontend](frontend) (Next.js). The Python API no longer serves an HTML page.
 
-- `src/app.py`: PDF extraction to structured article JSON/CSV
-- `src/add_ids.py`: add stable sequential IDs
-- `src/semantic_chunk.py`: semantic chunking pipeline (supports resume/checkpoints)
-- `src/embed.py`: embed full datasets
-- `src/embed_missing.py`: only embed records missing vectors
-- `src/recherche.py`: CLI semantic search
-- `src/api.py`: web API + browser frontend
-- `output/`: generated artifacts (`extracted`, `with_ids`, `chunks`, `embeddings`, `questions`)
-- `pdfs/`: input PDF files
+## Project Layout
 
-## Setup
+- [src/app.py](src/app.py): extract legal articles from PDFs into JSON/CSV
+- [src/add_ids.py](src/add_ids.py): add stable IDs
+- [src/semantic_chunk.py](src/semantic_chunk.py): semantic chunking pipeline
+- [src/embed.py](src/embed.py): generate embeddings
+- [src/embed_missing.py](src/embed_missing.py): backfill missing embeddings only
+- [src/recherche.py](src/recherche.py): CLI semantic search
+- [src/api.py](src/api.py): backend search API
+- [frontend](frontend): Next.js frontend
+- [output](output): generated artifacts
+- [pdfs](pdfs): source PDF files
 
-Run from project root.
+## Requirements
+
+- Python 3.10+
+- Node.js 20+ (for frontend)
+
+Install Python dependencies from project root:
 
 ```bash
 pip install pandas pymupdf requests google-genai numpy
 ```
 
-### Environment Variables
+## Environment Variables
 
-Gemini-backed scripts require one of:
-
-- `GOOGLE_API_KEY`
-- `GEMINI_API_KEY`
-
-Ollama question generation can use:
-
-- `OLLAMA_BASE_URL` (default: `http://localhost:11434`)
-- `OLLAMA_MODEL` (default: `qwen2.5:latest`)
-
-Recommended `.env` example:
+Create [\.env](.env) in the repository root:
 
 ```env
 GOOGLE_API_KEY=your_key_here
 ```
 
-## Typical Workflow
+Accepted API key names:
 
-### 1) Extract Articles
+- `GOOGLE_API_KEY`
+- `GEMINI_API_KEY`
 
-All PDFs in `pdfs/`:
+Frontend API base URL template:
+
+- [frontend/.env.local.example](frontend/.env.local.example)
+
+## Data Pipeline
+
+1. Extract from all PDFs:
 
 ```bash
 python src/app.py
 ```
 
-Single PDF:
-
-```bash
-python src/app.py --pdf "pdfs/codedecommerce.pdf"
-```
-
-Outputs go to `output/extracted/` by default.
-
-### 2) Add IDs
-
-Directory mode:
+2. Add IDs:
 
 ```bash
 python src/add_ids.py output/extracted --output-dir output/with_ids
 ```
 
-Single file mode:
-
-```bash
-python src/add_ids.py output/extracted/codedecommerce_articles.json --output-dir output/with_ids
-```
-
-### 3) Semantic Chunking (Optional)
+3. (Optional) semantic chunking:
 
 ```bash
 python src/semantic_chunk.py output/extracted/codedecommerce_articles.json
 ```
 
-Resume from checkpoint:
-
-```bash
-python src/semantic_chunk.py output/extracted/codedecommerce_articles.json --resume
-```
-
-### 4) Generate Embeddings
-
-Full embedding run:
+4. Generate embeddings:
 
 ```bash
 python src/embed.py output/extracted/codedecommerce_articles.json
 ```
 
-Only missing embeddings:
+5. Fill missing embeddings only:
 
 ```bash
 python src/embed_missing.py output/embeddings/codedecommerce_articles_embedded.json
 ```
 
-### 5) Search from CLI
+## Run Backend API
 
-Single embedded file:
-
-```bash
-python src/recherche.py output/embeddings/codedecommerce_articles_embedded.json -q "obligation d'ouvrir un compte"
-```
-
-All embedded files in folder:
-
-```bash
-python src/recherche.py output/embeddings -q "obligation d'ouvrir un compte"
-```
-
-## Web API and Frontend
-
-Run server:
+From repository root:
 
 ```bash
 python src/api.py
 ```
 
-Open browser UI:
+API endpoints:
 
-```text
-http://localhost:8000/
-```
+- `GET /` returns JSON service info (no built-in UI)
+- `GET /health` service + embeddings status
+- `GET /search?...` query via URL
+- `POST /search` query via JSON body
 
-The frontend uses the API key loaded on the server from `.env`.
-
-### API Endpoints
-
-- `GET /`: browser search page
-- `GET /health`: service and embeddings status
-- `GET /search?query=...&top_k=5&threshold=0.2`: quick search
-- `POST /search`: JSON search body
-
-Sample POST:
+### Example Search Request
 
 ```json
 {
   "query": "obligation d'ouvrir un compte",
   "top_k": 5,
-  "threshold": 0.2
+  "threshold": 0.2,
+  "close_filter": "balanced",
+  "verify_results": false
 }
 ```
 
-### API CLI Options
+`close_filter` values:
+
+- `off`
+- `loose`
+- `balanced`
+- `strict`
+
+Effective filter rule:
+
+$$
+effective\_threshold = \max(threshold, close\_filter\_threshold)
+$$
+
+Notes:
+
+- Search scans local embedded vectors; this is CPU work, not one API call per article.
+- Query embedding uses one Gemini embedding request per search.
+- Optional AI verification (`verify_results=true`) uses Gemini `generate_content` and may hit quota.
+- If verification fails (quota/rate limit), API still returns similarity-ranked results.
+
+## Run Frontend
+
+1. In one terminal (root):
 
 ```bash
-python src/api.py --help
+python src/api.py
 ```
 
-Key options:
-
-- `--host` (default from env or `0.0.0.0`)
-- `--port` (default from env or `8000`)
-- `--embeddings-dir` (default from env or `output/embeddings`)
-
-## Script Help
-
-Use built-in help for exact options/defaults:
+2. In another terminal:
 
 ```bash
-python src/app.py --help
-python src/add_ids.py --help
-python src/semantic_chunk.py --help
-python src/embed.py --help
-python src/embed_missing.py --help
-python src/recherche.py --help
-python src/api.py --help
+cd frontend
+npm install
+npm run dev
+```
+
+3. Open:
+
+```text
+http://localhost:3000
+```
+
+## CLI Search
+
+Search all embeddings in folder:
+
+```bash
+python src/recherche.py output/embeddings -q "obligation d'ouvrir un compte"
 ```
 
 ## Troubleshooting
 
-- `Google API key required`: verify `.env` is in project root and has `GOOGLE_API_KEY` or `GEMINI_API_KEY`.
-- `Embeddings source not found`: ensure `output/embeddings` exists or set `--embeddings-dir`.
-- Rate-limit/quota errors (`429 RESOURCE_EXHAUSTED`): reduce load, then retry.
-- PowerShell `curl` warnings: use `curl.exe` instead of `curl` alias.
+- `Google API key required`: verify [\.env](.env) has a valid key.
+- `Embeddings source not found`: check [output/embeddings](output/embeddings) or pass `--embeddings-dir`.
+- `429 RESOURCE_EXHAUSTED`: disable `verify_results` or retry later.
+- PowerShell `curl` alias issues: use `curl.exe`.
+- API returns relative source file paths by design.

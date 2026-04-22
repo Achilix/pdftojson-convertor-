@@ -5,8 +5,13 @@ import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
 from urllib.parse import parse_qs, urlparse
+
+try:
+	import google.genai as genai
+except ImportError:
+	genai = None
 
 try:
 	from .recherche import DEFAULT_MODEL, _iter_embedded_files, _load_env_file, _resolve_api_key, search_articles
@@ -19,6 +24,139 @@ _load_env_file(Path.cwd() / ".env")
 EMBEDDINGS_SOURCE = Path(os.environ.get("EMBEDDINGS_DIR", "output/embeddings")).resolve()
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "8000"))
+DEFAULT_VERIFY_MODEL = "gemini-2.0-flash"
+
+CLOSE_FILTER_THRESHOLDS = {
+	"off": 0.0,
+	"loose": 0.2,
+	"balanced": 0.35,
+	"strict": 0.5,
+}
+
+
+def _resolve_close_filter_threshold(close_filter: str) -> float:
+	key = (close_filter or "").strip().lower()
+	if key not in CLOSE_FILTER_THRESHOLDS:
+		raise ValueError("close_filter must be one of: off, loose, balanced, strict")
+	return CLOSE_FILTER_THRESHOLDS[key]
+
+
+def _closeness_label(similarity: float) -> str:
+	if similarity >= 0.6:
+		return "very-close"
+	if similarity >= 0.45:
+		return "close"
+	if similarity >= 0.3:
+		return "moderate"
+	return "weak"
+
+
+def _to_bool(value: Any) -> bool:
+	if isinstance(value, bool):
+		return value
+	if isinstance(value, (int, float)):
+		return value != 0
+	if isinstance(value, str):
+		return value.strip().lower() in {"1", "true", "yes", "on"}
+	return False
+
+
+def _extract_json_object(text: str) -> str:
+	start = text.find("{")
+	end = text.rfind("}")
+	if start == -1 or end == -1 or end < start:
+		raise ValueError("Verification model did not return JSON")
+	return text[start : end + 1]
+
+
+def _verify_results_with_gemini(
+	query: str,
+	results: List[Dict[str, Any]],
+	api_key: str,
+	verify_top_n: int,
+	verify_model: str,
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+	if genai is None:
+		raise RuntimeError("google-genai is required for AI verification. Install with: pip install google-genai")
+
+	checked_count = min(max(verify_top_n, 1), len(results))
+	target = []
+	for index, item in enumerate(results[:checked_count]):
+		target.append(
+			{
+				"index": index,
+				"article_number": item.get("article_number"),
+				"document_name": item.get("document_name"),
+				"content": str(item.get("content", ""))[:900],
+			}
+		)
+
+	prompt = (
+		"You are validating legal semantic-search matches. "
+		"Given a query and candidate passages, decide if each passage is relevant to answering the query. "
+		"Return ONLY valid JSON with this exact shape: "
+		"{\"overall\":\"high|medium|low\",\"explanation\":\"short text\","
+		"\"items\":[{\"index\":0,\"is_relevant\":true,\"score\":0.0,\"reason\":\"short\"}]}. "
+		"Score must be between 0 and 1."
+		f"\n\nQuery:\n{query}\n\nCandidates:\n{json.dumps(target, ensure_ascii=False)}"
+	)
+
+	client = genai.Client(api_key=api_key)
+	response = client.models.generate_content(
+		model=f"models/{verify_model}" if not verify_model.startswith("models/") else verify_model,
+		contents=prompt,
+	)
+
+	response_text = getattr(response, "text", "") or ""
+	parsed = json.loads(_extract_json_object(response_text))
+	items = parsed.get("items", []) if isinstance(parsed, dict) else []
+	by_index = {
+		int(item.get("index")): item
+		for item in items
+		if isinstance(item, dict) and isinstance(item.get("index"), int)
+	}
+
+	updated_results: List[Dict[str, Any]] = []
+	relevant_count = 0
+	for index, item in enumerate(results):
+		entry = dict(item)
+		if index < checked_count:
+			judge = by_index.get(index, {})
+			is_relevant = bool(judge.get("is_relevant", False))
+			score = judge.get("score", 0.0)
+			try:
+				score = max(0.0, min(1.0, float(score)))
+			except (TypeError, ValueError):
+				score = 0.0
+			entry["ai_is_relevant"] = is_relevant
+			entry["ai_relevance_score"] = score
+			entry["ai_reason"] = str(judge.get("reason", ""))[:200]
+			if is_relevant:
+				relevant_count += 1
+		updated_results.append(entry)
+
+	overall = "medium"
+	if checked_count > 0:
+		ratio = relevant_count / checked_count
+		if ratio >= 0.75:
+			overall = "high"
+		elif ratio <= 0.34:
+			overall = "low"
+
+	if isinstance(parsed, dict) and isinstance(parsed.get("overall"), str):
+		model_overall = parsed["overall"].strip().lower()
+		if model_overall in {"high", "medium", "low"}:
+			overall = model_overall
+
+	summary = {
+		"enabled": True,
+		"model": verify_model,
+		"checked_count": checked_count,
+		"relevant_count": relevant_count,
+		"overall": overall,
+		"explanation": str(parsed.get("explanation", "")).strip()[:300] if isinstance(parsed, dict) else "",
+	}
+	return summary, updated_results
 
 
 def _html_response(handler: BaseHTTPRequestHandler, html: str, status_code: int = 200) -> None:
@@ -40,28 +178,28 @@ def _frontend_html() -> str:
 	<title>Legal Search</title>
 	<style>
 		:root {
-			--bg: #f4f1ea;
+			--bg: #f2ecdf;
 			--surface: #ffffff;
-			--surface-2: #f7f4ef;
+			--line: #d7cfc2;
 			--text: #111111;
-			--muted: #666666;
-			--line: #d8d2c6;
+			--muted: #585858;
 			--accent: #111111;
-			--accent-soft: #e8e1d5;
+			--accent-soft: #ece4d7;
 			--radius: 18px;
 		}
 		* { box-sizing: border-box; }
 		body {
 			margin: 0;
 			font-family: Georgia, "Times New Roman", serif;
-			background:
-				radial-gradient(circle at top left, rgba(17, 17, 17, 0.06), transparent 30%),
-				linear-gradient(180deg, #fbfaf7 0%, var(--bg) 100%);
 			color: var(--text);
+			background:
+				radial-gradient(circle at top left, rgba(17, 17, 17, 0.1), transparent 35%),
+				radial-gradient(circle at bottom right, rgba(120, 95, 60, 0.08), transparent 32%),
+				linear-gradient(180deg, #faf8f3 0%, var(--bg) 100%);
 		}
 		.container {
-			width: min(1100px, calc(100% - 28px));
-			margin: 26px auto 40px;
+			width: min(920px, calc(100% - 28px));
+			margin: 34px auto 44px;
 			display: grid;
 			gap: 16px;
 		}
@@ -69,84 +207,99 @@ def _frontend_html() -> str:
 			background: var(--surface);
 			border: 1px solid var(--line);
 			border-radius: var(--radius);
-			padding: 16px;
+			padding: 20px;
+			box-shadow: 0 14px 30px rgba(30, 26, 20, 0.08);
 		}
 		h1 {
-			margin: 0 0 8px;
-			font-size: clamp(34px, 6vw, 58px);
+			margin: 0 0 10px;
+			font-size: clamp(34px, 8vw, 64px);
 			line-height: 0.95;
 		}
-		p { margin: 0; color: var(--muted); line-height: 1.6; }
-		.controls {
+		.description {
+			margin: 0;
+			color: var(--muted);
+			font-size: 16px;
+			line-height: 1.6;
+		}
+		.search-row {
 			display: grid;
-			grid-template-columns: 1fr 130px 130px;
+			grid-template-columns: 1fr auto;
 			gap: 10px;
-			margin-top: 12px;
+			margin-top: 14px;
 		}
-		input, textarea, button {
-			font: inherit;
-			border-radius: 14px;
-			border: 1px solid var(--line);
-			padding: 11px 12px;
-		}
-		textarea {
-			width: 100%;
-			min-height: 100px;
-			resize: vertical;
-			margin-top: 10px;
-		}
-		.toolbar {
+		.examples {
 			display: flex;
-			gap: 10px;
-			margin-top: 10px;
-			align-items: center;
+			gap: 8px;
 			flex-wrap: wrap;
+			margin-top: 10px;
+		}
+		input, button {
+			font: inherit;
+			border-radius: 12px;
+			padding: 12px 14px;
+		}
+		input {
+			border: 1px solid var(--line);
 		}
 		button {
-			background: var(--accent);
-			color: #fff;
-			cursor: pointer;
 			border: 0;
-			padding: 11px 14px;
+			background: var(--accent);
+			color: #ffffff;
+			cursor: pointer;
+			min-width: 110px;
+			transition: transform 140ms ease, opacity 140ms ease;
 		}
-		button.secondary {
+		button:hover {
+			opacity: 0.94;
+			transform: translateY(-1px);
+		}
+		.example-btn {
 			background: var(--accent-soft);
-			color: var(--text);
+			color: #1d1d1d;
+			min-width: auto;
+			padding: 8px 11px;
+			font-size: 13px;
 		}
 		.status {
-			background: var(--surface-2);
-			border: 1px solid var(--line);
+			margin-top: 10px;
+			border-radius: 12px;
 			padding: 8px 10px;
-			border-radius: 12px;
 			font-size: 13px;
-			color: var(--muted);
-		}
-		.status.error { color: #842029; background: #fdecef; }
-		.status.ok { color: #0f5132; background: #ecf7ef; }
-		.meta {
-			display: grid;
-			grid-template-columns: repeat(4, minmax(0, 1fr));
-			gap: 10px;
-		}
-		.meta div {
-			padding: 10px;
 			border: 1px solid var(--line);
-			border-radius: 12px;
-			background: var(--surface-2);
-			font-size: 13px;
+			background: #f6f2eb;
 			color: var(--muted);
 		}
+		.status.error { color: #842029; background: #fdecef; border-color: #f4c7cf; }
+		.status.ok { color: #0f5132; background: #ecf7ef; border-color: #bddac7; }
 		.results { display: grid; gap: 10px; }
 		.card {
 			border: 1px solid var(--line);
-			border-radius: 14px;
-			padding: 12px;
-			background: var(--surface);
+			border-radius: 12px;
+			padding: 14px;
+			background: #ffffff;
+			position: relative;
 		}
-		.card h3 { margin: 0 0 8px; font-size: 17px; }
-		.card .small { font-size: 12px; color: var(--muted); margin-top: 8px; }
-		@media (max-width: 900px) {
-			.controls, .meta { grid-template-columns: 1fr; }
+		.card.closest {
+			border-color: #bda57f;
+			background: linear-gradient(180deg, #fffaf2 0%, #ffffff 100%);
+		}
+		.closest-badge {
+			display: inline-block;
+			font-size: 11px;
+			font-weight: 700;
+			letter-spacing: 0.05em;
+			text-transform: uppercase;
+			padding: 4px 8px;
+			border-radius: 999px;
+			background: #1c1a17;
+			color: #f9f4ea;
+			margin-bottom: 8px;
+		}
+		.card h3 { margin: 0 0 6px; font-size: 17px; }
+		.card .small { margin-top: 8px; font-size: 12px; color: var(--muted); }
+		@media (max-width: 720px) {
+			.search-row { grid-template-columns: 1fr; }
+			button { width: 100%; }
 		}
 	</style>
 </head>
@@ -154,29 +307,17 @@ def _frontend_html() -> str:
 	<main class="container">
 		<section class="panel">
 			<h1>Legal Search</h1>
-			<p>Search across all embedded files. The server key is loaded from .env automatically.</p>
-
-			<div class="controls">
+			<p class="description">Ask a legal question and get the closest passages from your embedded documents.</p>
+			<div class="search-row">
 				<input id="query" type="text" placeholder="Type your legal query" />
-				<input id="topK" type="number" min="1" value="5" />
-				<input id="threshold" type="number" min="0" max="1" step="0.01" value="0.2" />
-			</div>
-			<textarea id="queryLong" placeholder="Optional longer query text"></textarea>
-
-			<div class="toolbar">
 				<button id="searchBtn" type="button">Search</button>
-				<button id="demoBtn" class="secondary" type="button">Load Example</button>
-				<span id="status" class="status">Ready.</span>
 			</div>
-		</section>
-
-		<section class="panel">
-			<div class="meta">
-				<div>Endpoint: <strong>/search</strong></div>
-				<div>Method: <strong>POST</strong></div>
-				<div>Source: <strong id="sourceLabel">...</strong></div>
-				<div>Files: <strong id="fileCount">...</strong></div>
+			<div class="examples">
+				<button class="example-btn" type="button" data-query="obligation d'ouvrir un compte">Example: Compte</button>
+				<button class="example-btn" type="button" data-query="resiliation de contrat commercial">Example: Contrat</button>
+				<button class="example-btn" type="button" data-query="delai de paiement et penalites">Example: Paiement</button>
 			</div>
+			<div id="status" class="status">Ready.</div>
 		</section>
 
 		<section class="panel">
@@ -189,15 +330,10 @@ def _frontend_html() -> str:
 	<script>
 		(function() {
 			const queryInput = document.getElementById('query');
-			const queryLongInput = document.getElementById('queryLong');
-			const topKInput = document.getElementById('topK');
-			const thresholdInput = document.getElementById('threshold');
 			const searchBtn = document.getElementById('searchBtn');
-			const demoBtn = document.getElementById('demoBtn');
+			const exampleButtons = Array.from(document.querySelectorAll('.example-btn'));
 			const statusEl = document.getElementById('status');
 			const resultsEl = document.getElementById('results');
-			const fileCountEl = document.getElementById('fileCount');
-			const sourceLabelEl = document.getElementById('sourceLabel');
 
 			function setStatus(message, kind) {
 				statusEl.textContent = message;
@@ -225,7 +361,9 @@ def _frontend_html() -> str:
 					const title = 'Article ' + (item.article_number || 'Unknown');
 					const doc = item.document_name || 'Unknown document';
 					const source = item.embedded_file || 'n/a';
-					return '<article class="card">'
+					const closest = idx === 0;
+					return '<article class="card' + (closest ? ' closest' : '') + '">'
+						+ (closest ? '<div class="closest-badge">Closest Match</div>' : '')
 						+ '<h3>#' + (idx + 1) + ' - ' + escapeHtml(title) + '</h3>'
 						+ '<p><strong>Similarity:</strong> ' + score.toFixed(1) + '% | <strong>Document:</strong> ' + escapeHtml(doc) + '</p>'
 						+ '<p>' + escapeHtml(content) + (item.content && String(item.content).length > 420 ? '...' : '') + '</p>'
@@ -236,39 +374,21 @@ def _frontend_html() -> str:
 				resultsEl.innerHTML = html;
 			}
 
-			async function loadHealth() {
-				try {
-					const response = await fetch('/health');
-					const data = await response.json();
-					fileCountEl.textContent = String(data.embedded_file_count || '0');
-					sourceLabelEl.textContent = String(data.embeddings_source || 'unknown');
-				} catch (err) {
-					fileCountEl.textContent = 'unavailable';
-					sourceLabelEl.textContent = 'unavailable';
-				}
-			}
-
 			async function runSearch() {
-				const longQuery = queryLongInput.value.trim();
-				const shortQuery = queryInput.value.trim();
-				const query = longQuery || shortQuery;
-				const topK = Number(topKInput.value || 5);
-				const threshold = Number(thresholdInput.value || 0);
-
+				const query = queryInput.value.trim();
 				if (!query) {
 					setStatus('Enter a query first.', 'error');
 					return;
 				}
 
 				searchBtn.disabled = true;
-				demoBtn.disabled = true;
 				setStatus('Searching...');
 
 				try {
 					const response = await fetch('/search', {
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ query: query, top_k: topK, threshold: threshold })
+						body: JSON.stringify({ query: query })
 					});
 
 					const data = await response.json();
@@ -284,22 +404,21 @@ def _frontend_html() -> str:
 					resultsEl.innerHTML = '<div class="status error">' + escapeHtml(message) + '</div>';
 				} finally {
 					searchBtn.disabled = false;
-					demoBtn.disabled = false;
 				}
 			}
 
 			searchBtn.addEventListener('click', runSearch);
-			demoBtn.addEventListener('click', function() {
-				queryInput.value = "obligation d'ouvrir un compte";
-				setStatus('Example loaded. Click Search.', 'ok');
+			exampleButtons.forEach(function(btn) {
+				btn.addEventListener('click', function() {
+					queryInput.value = String(btn.dataset.query || '');
+					runSearch();
+				});
 			});
 			queryInput.addEventListener('keydown', function(event) {
 				if (event.key === 'Enter') {
 					runSearch();
 				}
 			});
-
-			loadHealth();
 		})();
 	</script>
 </body>
@@ -359,9 +478,34 @@ def _parse_search_request(handler: BaseHTTPRequestHandler) -> Dict[str, Any]:
 		"query": _value("query", ""),
 		"top_k": _value("top_k", 5),
 		"threshold": _value("threshold", 0.0),
+		"close_filter": _value("close_filter", "balanced"),
+		"verify_results": _value("verify_results", False),
+		"verify_top_n": _value("verify_top_n", 3),
+		"verify_model": _value("verify_model", DEFAULT_VERIFY_MODEL),
 		"model": _value("model", DEFAULT_MODEL),
 		"api_key": _value("api_key", ""),
 	}
+
+
+def _to_relative_source_path(path_value: str) -> str:
+	try:
+		path_obj = Path(path_value)
+		if not path_obj.is_absolute():
+			return path_obj.as_posix()
+
+		resolved = path_obj.resolve()
+		workspace_root = Path.cwd().resolve()
+		try:
+			return resolved.relative_to(workspace_root).as_posix()
+		except ValueError:
+			pass
+
+		try:
+			return resolved.relative_to(EMBEDDINGS_SOURCE.parent).as_posix()
+		except ValueError:
+			return path_obj.name or str(path_value).replace("\\", "/")
+	except Exception:
+		return str(path_value).replace("\\", "/")
 
 
 def _serialize_result(article: Dict[str, Any], similarity: float) -> Dict[str, Any]:
@@ -371,9 +515,10 @@ def _serialize_result(article: Dict[str, Any], similarity: float) -> Dict[str, A
 		if key not in {"embedding", "_embedded_file"}
 	}
 	payload["similarity"] = similarity
+	payload["closeness_label"] = _closeness_label(similarity)
 	embedded_file = article.get("_embedded_file")
 	if embedded_file:
-		payload["embedded_file"] = embedded_file
+		payload["embedded_file"] = _to_relative_source_path(str(embedded_file))
 	return payload
 
 
@@ -396,7 +541,7 @@ class SearchAPIHandler(BaseHTTPRequestHandler):
 	def _route(self) -> None:
 		parsed_url = urlparse(self.path)
 		if parsed_url.path in {"/", "/index.html"}:
-			self._handle_frontend()
+			self._handle_root()
 			return
 
 		if parsed_url.path == "/health":
@@ -421,8 +566,19 @@ class SearchAPIHandler(BaseHTTPRequestHandler):
 			},
 		)
 
-	def _handle_frontend(self) -> None:
-		_html_response(self, _frontend_html())
+	def _handle_root(self) -> None:
+		_json_response(
+			self,
+			200,
+			{
+				"status": "ok",
+				"message": "Built-in UI removed. Use your React/Next frontend with this API.",
+				"endpoints": {
+					"health": "/health",
+					"search": "/search",
+				},
+			},
+		)
 
 	def _handle_search(self) -> None:
 		if not EMBEDDINGS_SOURCE.exists():
@@ -449,6 +605,15 @@ class SearchAPIHandler(BaseHTTPRequestHandler):
 			if threshold < 0.0 or threshold > 1.0:
 				raise ValueError("threshold must be between 0.0 and 1.0")
 
+			close_filter = str(params["close_filter"])
+			close_filter_threshold = _resolve_close_filter_threshold(close_filter)
+			effective_threshold = max(threshold, close_filter_threshold)
+			verify_results = _to_bool(params["verify_results"])
+			verify_top_n = int(params["verify_top_n"])
+			if verify_top_n < 1:
+				raise ValueError("verify_top_n must be at least 1")
+			verify_model = str(params["verify_model"]).strip() or DEFAULT_VERIFY_MODEL
+
 			api_key = _resolve_api_key(str(params["api_key"]).strip() or None)
 			if not api_key:
 				raise ValueError("Google API key required. Set GOOGLE_API_KEY or GEMINI_API_KEY, or send api_key in the request.")
@@ -459,8 +624,42 @@ class SearchAPIHandler(BaseHTTPRequestHandler):
 				api_key,
 				str(params["model"]).strip() or DEFAULT_MODEL,
 				top_k,
-				threshold,
+				effective_threshold,
 			)
+
+			serialized_results = [
+				_serialize_result(article, similarity)
+				for article, similarity in results
+			]
+
+			ai_verification: Dict[str, Any] = {
+				"enabled": False,
+				"model": verify_model,
+				"checked_count": 0,
+				"relevant_count": 0,
+				"overall": "not-run",
+				"explanation": "",
+			}
+
+			if verify_results and serialized_results:
+				try:
+					ai_verification, serialized_results = _verify_results_with_gemini(
+						query,
+						serialized_results,
+						api_key,
+						verify_top_n,
+						verify_model,
+					)
+				except Exception as verify_exc:
+					ai_verification = {
+						"enabled": False,
+						"model": verify_model,
+						"checked_count": 0,
+						"relevant_count": 0,
+						"overall": "not-run",
+						"explanation": "AI verification unavailable; returning similarity-ranked results.",
+						"error": str(verify_exc),
+					}
 		except ValueError as exc:
 			_json_response(self, 400, {"error": str(exc)})
 			return
@@ -476,12 +675,17 @@ class SearchAPIHandler(BaseHTTPRequestHandler):
 				"model": str(params["model"]).strip() or DEFAULT_MODEL,
 				"top_k": top_k,
 				"threshold": threshold,
+				"close_filter": close_filter,
+				"close_filter_threshold": close_filter_threshold,
+				"effective_threshold": effective_threshold,
+				"top_similarity": results[0][1] if results else 0.0,
+				"verify_results": verify_results,
+				"verify_top_n": verify_top_n,
+				"verify_model": verify_model,
+				"ai_verification": ai_verification,
 				"embeddings_source": str(EMBEDDINGS_SOURCE),
 				"result_count": len(results),
-				"results": [
-					_serialize_result(article, similarity)
-					for article, similarity in results
-				],
+				"results": serialized_results,
 			},
 		)
 
